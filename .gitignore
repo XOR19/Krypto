@@ -10,7 +10,8 @@
 
 # Libraries
 *.lib
-*.a
+#For convenience
+#*.a
 *.la
 *.lo
 
