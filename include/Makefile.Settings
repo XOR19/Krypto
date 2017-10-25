@@ -1,0 +1,37 @@
+##************************************************************
+##         Europäisches Institut für Systemsicherheit        *
+##   Praktikum "Kryptographie und Datensicherheitstechnik"   *
+##                                                           *
+## Globales Makefile für das Praktikum                       *
+##                                                           *
+##************************************************************
+
+CC		= gcc
+UNIFDEF		= unifdef
+INSTALL		= /usr/bin/install
+INSTALL_SRC	= $(INSTALL) -m 640 # -g krypto
+INSTALL_PUBBIN	= $(INSTALL) -m 750 # -g krypto
+INSTALL_PRIVBIN	= $(INSTALL) -m 700 # -g krypto
+AR		= ar
+RANLIB		= /bin/true
+CHMOD		= chmod
+
+INCLDIR	= $(PRAKTROOT)/include
+LIBDIR	= $(PRAKTROOT)/lib
+
+GCCWARN	= -Wall -Wstrict-prototypes -Wpointer-arith -Wcast-qual\
+	  -Wwrite-strings -Waggregate-return -Wstrict-prototypes\
+	  -Wnested-externs -Winline # -Wredundant-decls -Wconversion 
+PLIBS	= -L$(LIBDIR) -lpraktikum
+DEFINES	= -DPRAKTIKUM -DSVR4
+
+X11INCL		= -I/usr/local/X11/include
+X11LIBS		= -L/usr/local/X11/lib -R/usr/local/X11/lib -lX11
+CURSESLIBS	= -lncurses
+CFLAGS_DEBUG	= -g  -I$(INCLDIR) $(GCCWARN) $(DEFINES) $(XCF)
+CFLAGS_OPT	= -O3 -I$(INCLDIR) $(GCCWARN) $(DEFINES) $(XCF) 
+CFLAGS		= $(CFLAGS_DEBUG)
+LFLAGS		= $(PLIBS) $(SLIBS)
+
+STD_CC		= cc
+STD_CFLAGS_DEBUG= -g -I$(INCLDIR) $(DEFINES) $(XCF)
