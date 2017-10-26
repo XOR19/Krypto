@@ -9,12 +9,19 @@
 ** vigenere.c: Implementierung einer Vigenere-Chiffre
 **/
 
+#define INC_KEY_ON_IGNORE 0
+
+// Bad workaround for today
+#define __gmplib_h
+typedef int mpz_t;
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <praktikum.h>
 
 /*********************  Globale Hilfsbvariabeln  *******************/
 String Key;     /* Schlüssel */
+int keyPos;
 
 /*
  * int Encipher(int c) : Interpretiert C als Zeichen, verschlüsselt es nach der
@@ -27,6 +34,31 @@ static int Encipher(int c)
     /*>>>>                                <<<<*
      *>>>> AUFGABE: Verschlüsseln von `C' <<<<*
      *>>>>                                <<<<*/
+
+#if !INC_KEY_ON_IGNORE
+	if(c>='A' && c<='Z'){
+#endif
+
+		int keyC = Key[keyPos++];
+		if(!keyC){
+			keyC = Key[0];
+			keyPos = 1;
+		}
+
+#if INC_KEY_ON_IGNORE
+	if(c>='A' && c<='Z'){
+#endif
+
+		int move = (keyC - 'A' + 1)%26; // 'Z' würde probleme machen
+
+		c += move;
+		if(c>'Z')
+			c -= 26;  // 'Z' - 'A'
+
+	}
+
+	return c;
+
   }
 
 
@@ -41,6 +73,32 @@ static int Decipher(int c)
     /*>>>>                                <<<<*
      *>>>> AUFGABE: Entschlüsseln von `C' <<<<*
      *>>>>                                <<<<*/
+
+
+#if !INC_KEY_ON_IGNORE
+	if(c>='A' && c<='Z'){
+#endif
+
+		int keyC = Key[keyPos++];
+		if(!keyC){
+			keyC = Key[0];
+			keyPos = 1;
+		}
+
+#if INC_KEY_ON_IGNORE
+	if(c>='A' && c<='Z'){
+#endif
+
+		int move = (keyC - 'A' + 1)%26; // 'Z' würde probleme machen
+
+		c -= move;
+		if(c<'A')
+			c += 26;  // 'Z' - 'A'
+
+	}
+
+	return c;
+
   }
 
 
@@ -110,6 +168,7 @@ int main(int argc, char **argv)
    *    decipher : Flag, == 1 im Entschlüsselungsmodus, ansonsten 0.
    */
 
+  keyPos = 0;
   do {
     fgets(zeile,sizeof(zeile),infile);
     if (!feof(infile)) {
@@ -118,6 +177,14 @@ int main(int argc, char **argv)
       /*>>>>                                           <<<<*
        *>>>> AUFGABE: Vigenere-Verschlüsseln von ZEILE <<<<*
        *>>>>                                           <<<<*/
+
+      char* ptr = zeile;
+      while(*ptr){
+    	  *ptr = decipher?Decipher(*ptr):Encipher(*ptr);
+    	  ptr++;
+      }
+
+
       fprintf(outfile,"%s\n",zeile);
     }
   }
