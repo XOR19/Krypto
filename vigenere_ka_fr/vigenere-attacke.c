@@ -19,7 +19,7 @@ typedef int mpz_t;
 #include <stdio.h>
 #include <stdlib.h>
 #include <praktikum.h>
-#include <limits.h>
+#include <unistd.h>
 
 #define NUMCHARS    26       /* Anzahl der Zeichenm, die betrachtet werden ('A' .. 'Z') */
 #define MaxFileLen  32768    /* Maximale Größe des zu entschlüsselnden Textes */
@@ -187,13 +187,24 @@ int main(int argc, char **argv)
   int curr = roundedL;
   int next = curr+1;
   int up = -1;
+  char keybuf[TextLength+1];
   
   while(next>=0 && curr<=TextLength){
 	  double conf;
+	  double confm = 0;
 	  for(i=0; i<curr; i++){
 		  CountChars(i, curr, h);
-		  GetKey(h, TextLength/curr, &conf);
-		  // Test what good conf is, bigger, worse
+		  int c = GetKey(h, TextLength/curr, &conf);
+		  confm += conf;
+		  keybuf[i] = c;
+	  }
+	  keybuf[curr] = 0;
+	  confm /= curr;
+	  printf("Key for len %i with error %f:%s\n", curr, confm, keybuf);
+	  if(confm<0.015){ // Can be done better?
+		  printf("Likely Key:%s\n", keybuf);
+		  execl("vigenere", "vigenere", WorkFile, "testtext.crack", keybuf, "decipher", 0);
+		  return 0;
 	  }
 	  
 	  int tmp = curr;
@@ -203,6 +214,7 @@ int main(int argc, char **argv)
 	  up = -up;
   }
   
+  printf("nothing found\n");
 
   return 0;
 }
