@@ -203,7 +203,7 @@ int main(int argc, char **argv)
 	  printf("Key for len %i with error %f:%s\n", curr, confm, keybuf);
 	  if(confm<0.015){ // Can be done better?
 		  printf("Likely Key:%s\n", keybuf);
-		  execl("vigenere", "vigenere", WorkFile, "testtext.crack", keybuf, "decipher", 0);
+		  execl("vigenere", "vigenere", WorkFile, "testtext.crack", keybuf, "decipher", NULL);
 		  return 0;
 	  }
 	  
