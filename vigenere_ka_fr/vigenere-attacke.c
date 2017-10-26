@@ -9,6 +9,13 @@
 ** vigenere_attacke.c: Brechen der Vigenere-Chiffre
 **/
 
+
+// Bad workaround for today
+#define __gmplib_h
+typedef int mpz_t;
+
+#define ASSERT(xx)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <praktikum.h>
@@ -117,6 +124,11 @@ static void CountChars( int start, int offset, int h[NUMCHARS])
     for (i=0; i<NUMCHARS; i++) h[i] = 0;
 
     /*****************  Aufgabe  *****************/
+    for(i=start; i<TextLength && i>=0; i+=offset){
+    	c = TextArray[i];
+    	ASSERT(c>='A' && c<='Z')
+    	h[c-'A']++;
+    }
   }
 
 
@@ -129,5 +141,21 @@ int main(int argc, char **argv)
   GetFile();               /* zu bearbeitendes File einlesen */
 
   /*****************  Aufgabe  *****************/
+  int h[NUMCHARS];
+  CountChars(0, 1, h);
+  double I_c = 0;
+  int i;
+  for(i=0; i<NUMCHARS; i++){
+	  double v = h[i]/(double)TextLength;
+	  I_c += v*v;
+  }
+  double I_c_rand = 1.0/NUMCHARS;
+  double I_c_eng = 0.065;
+
+  double v = (I_c-I_c_rand)/(I_c_eng-I_c_rand); //==(n-l)/(l(n-1))
+  double l = TextLength/(v*(TextLength+1)+1);
+
+  printf("l: %f\n", l);
+
   return 0;
 }
