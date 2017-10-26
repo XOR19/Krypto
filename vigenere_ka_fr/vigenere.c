@@ -11,10 +11,6 @@
 
 #define INC_KEY_ON_IGNORE 0
 
-// Bad workaround for today
-#define __gmplib_h
-typedef int mpz_t;
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <praktikum.h>

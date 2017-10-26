@@ -10,10 +10,6 @@
 **/
 
 
-// Bad workaround for today
-#define __gmplib_h
-typedef int mpz_t;
-
 #define ASSERT(xx)
 
 #include <stdio.h>
