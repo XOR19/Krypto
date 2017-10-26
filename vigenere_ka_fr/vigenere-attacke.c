@@ -19,6 +19,7 @@ typedef int mpz_t;
 #include <stdio.h>
 #include <stdlib.h>
 #include <praktikum.h>
+#include <limits.h>
 
 #define NUMCHARS    26       /* Anzahl der Zeichenm, die betrachtet werden ('A' .. 'Z') */
 #define MaxFileLen  32768    /* Maximale Größe des zu entschlüsselnden Textes */
@@ -132,6 +133,31 @@ static void CountChars( int start, int offset, int h[NUMCHARS])
   }
 
 
+
+static int GetKey(int h[NUMCHARS], int n, double* conf){
+	int i;
+	int off;
+	int min = -1;
+	double min_err = 1e100;
+	for(off=0; off<NUMCHARS; off++){
+		double err = 0;
+		for(i=0; i<NUMCHARS; i++){
+			double e = h[(i+off)%NUMCHARS]; // TODO hier +offset oder in PropTable
+			e /= n;
+			e -= PropTable[i];
+			err += e*e; // Quadratischer fehler minimieren
+		}
+		if(err<min_err){
+			min_err = err;
+			min = off;
+		}
+	}
+	if(conf)
+		*conf = min_err;
+	return min==0?'Z':min-1+'A';
+}
+
+
 /*------------------------------------------------------------------------------*/
 
 int main(int argc, char **argv)
@@ -154,8 +180,29 @@ int main(int argc, char **argv)
 
   double v = (I_c-I_c_rand)/(I_c_eng-I_c_rand); //==(n-l)/(l(n-1))
   double l = TextLength/(v*(TextLength+1)+1);
-
+  
   printf("l: %f\n", l);
+  
+  int roundedL = (int)(l+0.5);
+  int curr = roundedL;
+  int next = curr+1;
+  int up = -1;
+  
+  while(next>=0 && curr<=TextLength){
+	  double conf;
+	  for(i=0; i<curr; i++){
+		  CountChars(i, curr, h);
+		  GetKey(h, TextLength/curr, &conf);
+		  // Test what good conf is, bigger, worse
+	  }
+	  
+	  int tmp = curr;
+	  curr = next;
+	  next = tmp;
+	  next += up;
+	  up = -up;
+  }
+  
 
   return 0;
 }
