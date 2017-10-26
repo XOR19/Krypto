@@ -138,7 +138,7 @@ static int GetKey(int h[NUMCHARS], int n, double* conf){
 	for(off=0; off<NUMCHARS; off++){
 		double err = 0;
 		for(i=0; i<NUMCHARS; i++){
-			double e = h[(i+off)%NUMCHARS]; // TODO hier +offset oder in PropTable
+			double e = h[(i+off)%NUMCHARS];
 			e /= n;
 			e -= PropTable[i];
 			err += e*e; // Quadratischer fehler minimieren
