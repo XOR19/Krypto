@@ -29,7 +29,7 @@
 * try_max gibt die maximal zulässige Versuchsanzahl zurück.
 **/
 
-void open_connection(char *server_id, int *diff1, int *diff2);
+void open_connection(char *server_id, int *diff1, int *diff2, const char* username, int uid);
 int try_pin(int pin);
 int try_pins(int pin[], int npin);
 int try_max(void);

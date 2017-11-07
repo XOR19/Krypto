@@ -15,8 +15,6 @@ struct in_addr;
 #include <string.h>
 #include <unistd.h>
 
-#include <network.h> /* nur fuer MakeNetName */
-
 #define DEFAULT_HOST "poincare.ira.uka.de"
 /*#define DEFAULT_HOST "localhost"*/
 #define DEFAULT_PORT 6453
@@ -189,7 +187,7 @@ inet_aton(cp, addr)
 	return (1);
 }
 
-void open_connection(char *server_id, int *diff1, int *diff2)
+void open_connection(char *server_id, int *diff1, int *diff2, const char* username, int uid)
 {
 	struct sockaddr_in sin;
 	char *hostname = DEFAULT_HOST;
@@ -233,9 +231,9 @@ void open_connection(char *server_id, int *diff1, int *diff2)
 		exit(2);
 	}
 	memset(msgbuf, 0, 16);
-	login = MakeNetName(NULL);
+	login = username;
 	strncpy(msgbuf+8, login, 8);
-	*((int *)(msgbuf+4)) = htonl(getuid());
+	*((int *)(msgbuf+4)) = htonl(uid);
 	msgbuf[3] = 0x00;
 	if (write(sd, msgbuf+3, 13) != 13) {
 		perror("write");

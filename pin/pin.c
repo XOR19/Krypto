@@ -30,9 +30,9 @@ void attack(void)
 
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
-	open_connection(0, &diff1, &diff2);
+	open_connection(0, &diff1, &diff2, "cr4ck1411"/*MakeNetName(NULL)*/, 666/*getuid()*/);
 	attack();
 	close_connection();
 	exit(0);
