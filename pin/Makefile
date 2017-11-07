@@ -7,6 +7,8 @@ LIB=
 pin: ${OBJECTS}
 	cc -o pin ${LDFLAGS} ${OBJECTS} ${LIB}
 
+all: pin
+
 clean:
 	rm -f ${OBJECTS} core *.core pin
 
