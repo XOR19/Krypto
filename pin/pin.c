@@ -15,7 +15,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <linux/limits.h>
-#include <math.h>
+#include <time.h>
 
 #include "pin.h"
 
@@ -27,7 +27,7 @@ static int likelyhood(uint32_t pin, uint32_t diff){
 	int likely = 0;
 	uint32_t d;
 	while(--i){
-		d = (pin+diff)%10;
+		d = (pin+10-diff)%10;
 		pin /= 10;
 		diff /= 10;
 		if(d<=5) // doppelt so wahrscheinlich wie 6,7,8,9
@@ -88,9 +88,9 @@ static uint32_t generateLikelyPins(uint32_t num_diffs, const uint32_t* diffs, ui
 		tmp[0] = likelyhood(pin, 0);
 		if(tmp[0]==-1)
 			valid = 0;
-		for(i=1; i<=num_diffs; i++){
-			tmp[i] = likelyhood(pin, diffs[i]);
-			if(tmp[i]==-1)
+		for(i=0; i<num_diffs; i++){
+			tmp[i+1] = likelyhood(pin, diffs[i]);
+			if(tmp[i+1]==-1)
 				valid = 0;
 		}
 		if(!valid){
@@ -100,6 +100,10 @@ static uint32_t generateLikelyPins(uint32_t num_diffs, const uint32_t* diffs, ui
 			}
 		}
 	}
+	for(i=0; i<=num_diffs; i++){
+		printf("%d ", total_space[i]);
+	}
+	printf("\n");
 	for(pin=1000; pin<10000; pin++){
 		l = likelyhood(pin, 0);
 		likely = (1<<l)/(double)total_space[0];
@@ -109,7 +113,7 @@ static uint32_t generateLikelyPins(uint32_t num_diffs, const uint32_t* diffs, ui
 				goto invalid_pin;
 			likely += (1<<l)/(double)total_space[i+1];
 		}
-		likely /= 3;
+		likely /= num_diffs+1;
 		valid_pins = insert(num_pins, valid_pins, prob, pins, likely, pin);
 		invalid_pin:
 		;
@@ -120,23 +124,34 @@ static uint32_t generateLikelyPins(uint32_t num_diffs, const uint32_t* diffs, ui
 	return valid_pins;
 }
 
-static int attack(uint32_t num_diffs, const uint32_t* diffs, int offline)
+static int attack(uint32_t num_diffs, const uint32_t* diffs, int offline, int auto_pin)
 {
-	uint32_t max_tries = offline?100:try_max();
+	uint32_t max_tries = offline>=2?100:try_max();
 	if(max_tries>9000)
 		max_tries = 9000;
 	uint32_t pin[9000]; // maximale anzahl an pins, da 0??? nicht geht
 	double prob[9000];
 	uint32_t num_pins = generateLikelyPins(num_diffs, diffs, max_tries, pin, prob);
-	if(offline){
+	if(offline>=2){
 		uint32_t i=0;
+		uint32_t gotit = -1;
 		double sum = 0;
-		for(i=0; i<max_tries; i++){
+		for(i=0; i<num_pins; i++){
+			if(pin[i]==auto_pin)
+				gotit = i;
 			double p = prob[i];
 			sum += p;
 			printf("Pin[%d]=%d with probability %f\n", i, pin[i], p);
 		}
 		printf("Probability: %f\n", sum);
+		if(offline==3){
+			if(gotit!=-1){
+				printf("Die PIN ist: %d\n", auto_pin);
+				return auto_pin;
+			}
+			printf("Die PIN wurde nicht gefunden :(\n");
+			return -1;
+		}
 		return num_pins==0?-1:pin[0];
 	}else{
 		int index = try_pins(pin, num_pins);
@@ -159,6 +174,8 @@ static void printhelp(const char* cmd) {
 	printf("  -u, --user        user send to Testserver\n");
 	printf("  -d, --diff        Add an diff\n");
 	printf("  -o                No test server\n");
+	printf("  -r                Anzahl der wiederholungen\n");
+	printf("  -z                Zufällig erzeugte pins benutzen\n");
 	printf("  -h, --help        Diese Hilfe ausgeben und beenden\n");
 	printf("  -v, --version     Versionsnummer ausgeben und beenden\n");
 	printf("\n");
@@ -183,9 +200,32 @@ const static struct option long_options[] = {
 		{ "help", no_argument, 0, 'h' },
 		{ 0, 0, 0, 0 } };
 
+static int generateBadPin(){
+	int pin = ((rand()&0xF)%10)*1000+((rand()&0xF)%10)*100+((rand()&0xF)%10)*10+((rand()&0xF)%10);
+	if(pin<1000)
+		pin += 1000;
+	return pin;
+}
+
+static int pin_diff(int p1, int p2){
+	uint32_t i=5;
+	int diff = 0;
+	int mul = 1;
+	uint32_t d;
+	while(--i){
+		d = (p1-p2+10)%10;
+		p1 /= 10;
+		p2 /= 10;
+		diff += d*mul;
+		mul*=10;
+	}
+	return diff;
+}
+
 int main(int argc, char **argv)
 {
 
+	srand(time(NULL));
 	int server_set = 0;
 	char server_name[PATH_MAX];
 	char username[PATH_MAX] = "cr4ck1411";
@@ -197,9 +237,10 @@ int main(int argc, char **argv)
 		uint32_t diff;
 	}*diffs = 0;
 
+	int times = 1;
 	int opt;
 	int option_index;
-	while ((opt = getopt_long(argc, argv, "s:i:u:d:ohH?vV", long_options,
+	while ((opt = getopt_long(argc, argv, "zr:s:i:u:d:ohH?vV", long_options,
 			&option_index)) != -1) {
 
 		switch (opt) {
@@ -232,6 +273,12 @@ int main(int argc, char **argv)
 		case 'o':
 			server_set = 2;
 			break;
+		case 'z':
+			server_set = 3;
+			break;
+		case 'r':
+			times = (int)strtol(optarg, NULL, 10);
+			break;
 		}
 
 	}
@@ -245,18 +292,36 @@ int main(int argc, char **argv)
 	if(server_set!=2)
 		num_diffs += 2;
 	int* diff_array = malloc(sizeof(int)*num_diffs);
-	int* ptr = diff_array;
-	while(diffs){
-		*ptr++ = diffs->diff;
-		struct diffs* p = diffs->next;
-		free(diffs);
-		diffs = p;
+
+	uint32_t t = times;
+	uint32_t v = 0;
+	while(t--){
+		int* ptr = diff_array;
+		while(diffs){
+			*ptr++ = diffs->diff;
+			struct diffs* p = diffs->next;
+			free(diffs);
+			diffs = p;
+		}
+		if(server_set<2)
+			open_connection(server_set?server_name:0, ptr, ptr+1, username/*MakeNetName(NULL)*/, uid/*getuid()*/);
+		int pin;
+		if(server_set==3){
+			pin = generateBadPin();
+			int pin1 = generateBadPin();
+			int pin2 = generateBadPin();
+			*ptr++ = pin_diff(pin, pin1);
+			*ptr = pin_diff(pin, pin2);
+			printf("pin: %d %d %d\ndiffs: %d %d\n", pin, pin1, pin2, *(ptr-1), *ptr);
+		}
+		if(attack(num_diffs, diff_array, server_set, pin)==pin)
+			v++;
+		if(server_set<2)
+			close_connection();
 	}
-	if(server_set!=2)
-		open_connection(server_set?server_name:0, ptr, ptr+1, username/*MakeNetName(NULL)*/, uid/*getuid()*/);
-	attack(num_diffs, diff_array, server_set==2);
 	free(diff_array);
-	if(server_set!=2)
-		close_connection();
+	if(times>1){
+		printf("we got %d from %d tries\n", v, times);
+	}
 	exit(0);
 }
