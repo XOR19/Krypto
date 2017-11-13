@@ -343,7 +343,7 @@ int main(int argc, char **argv) {
 			int pin2 = generatePin();
 			*ptr++ = pin_diff(pin, pin1);
 			*ptr = pin_diff(pin, pin2);
-			printf("pin: %d %d %d\ndiffs: %d %d\n", pin, pin1, pin2, *(ptr - 1),
+			debugPrint("pin: %d %d %d\ndiffs: %d %d\n", pin, pin1, pin2, *(ptr - 1),
 					*ptr);
 		}
 		if (attack(num_diffs, diff_array, server_set, pin) != -1){
