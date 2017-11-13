@@ -89,7 +89,7 @@ static uint32_t generateLikelyPins(uint32_t num_diffs, const uint32_t* diffs,
 
 	if (num_pins > 9000)
 		num_pins = 9000;
-	double* pin_likelyhood = prob ? prob : malloc(sizeof(double) * 9000);
+	double* pin_likelyhood = prob ? prob : malloc(sizeof(double) * num_pins);
 	uint32_t* total_space = (uint32_t*) malloc(
 			sizeof(uint32_t) * (num_diffs + 1) * 2);
 	uint32_t* tmp = total_space + num_diffs + 1;
