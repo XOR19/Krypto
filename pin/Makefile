@@ -6,6 +6,7 @@ LIB=
 
 pin: ${OBJECTS}
 	cc -o pin ${LDFLAGS} ${OBJECTS} ${LIB}
+    override CFLAGS += -std=gnu99 
 
 all: pin
 
