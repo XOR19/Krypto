@@ -66,10 +66,11 @@ static uint32_t insert(uint32_t max_size, uint32_t size, double* keys,
 	}
 
 	uint32_t index = size;
-	if (index == 0 || size < max_size) {
+	if (size < max_size) {
 		size++;
-	} else if (keys[--index] >= key) {
-		return size;
+	} else {
+		if (index == 0 || keys[--index] >= key)
+			return size;
 	}
 
 	while (index--) {
