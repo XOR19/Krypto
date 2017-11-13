@@ -56,15 +56,6 @@ static int likelyhood(uint32_t pin, uint32_t diff) {
 
 static uint32_t insert(uint32_t max_size, uint32_t size, double* keys,
 		uint32_t* values, double key, uint32_t value) {
-	if (size == 0) {
-		if (max_size) {
-			keys[0] = key;
-			values[0] = value;
-			return 1;
-		}
-		return 0;
-	}
-
 	uint32_t index = size;
 	if (size < max_size) {
 		size++;
@@ -355,10 +346,23 @@ int main(int argc, char **argv) {
 			printf("pin: %d %d %d\ndiffs: %d %d\n", pin, pin1, pin2, *(ptr - 1),
 					*ptr);
 		}
-		if (attack(num_diffs, diff_array, server_set, pin) == pin)
+		if (attack(num_diffs, diff_array, server_set, pin) != -1){
+			if(!PRINT){
+				printf("x");
+				fflush(stdout);
+			}
 			v++;
+		}else{
+			if(!PRINT){
+				printf(".");
+				fflush(stdout);
+			}
+		}
 		if (server_set < 2)
 			close_connection();
+	}
+	if(!PRINT){
+		printf("\n");
 	}
 	free(diff_array);
 	if (times > 1) {
@@ -377,8 +381,8 @@ int try() {
     int pool_pin2 = generatePin();
 
     int diffs[2];
-    diffs[1] = pin_diff(pin, pool_pin1);
-    diffs[2] = pin_diff(pin, pool_pin2);
+    diffs[0] = pin_diff(pin, pool_pin1);
+    diffs[1] = pin_diff(pin, pool_pin2);
 
     int pins[100];
 
