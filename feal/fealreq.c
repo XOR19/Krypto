@@ -117,7 +117,7 @@ static void dorequest(struct FealRequest *fr)
       }
 #ifdef __WIN32__
       DWORD timeout = 30 * 1000;
-      setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+      setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
 #else
       signal(SIGALRM,sig_alarm);
 #endif
