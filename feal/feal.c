@@ -314,16 +314,21 @@ int main(int argc, char **argv) {
 		Feal_NewKey();
 
 		feal_cl_key_pair key;
+		feal_cl_size_t valid;
 		if(known>0){
-			known_plaintext_attack_rand(known, 1, &key, use_cl);
+			valid = known_plaintext_attack_rand(known, 1, &key, use_cl);
 		}else{
-			choosen_plaintext_attack(1, &key);
+			valid = choosen_plaintext_attack(1, &key);
 		}
 		k1 = key.k1;
 		k2 = key.k2;
 		k3 = key.k3;
-		printf("Lösung: $%02x $%02x $%02x: %s\n", k1, k2, k3,
-				Feal_CheckKey(k1, k2, k3) ? "OK!" : "falsch");
+		if(valid){
+			printf("Lösung: $%02x $%02x $%02x: %s\n", k1, k2, k3,
+					Feal_CheckKey(k1, k2, k3) ? "OK!" : "falsch");
+		}else{
+			printf("Keine valide Lösung??");
+		}
 	}else{
 		int rem = argc - optind;
 		if(rem%3!=0 || rem==0){
