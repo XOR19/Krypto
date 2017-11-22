@@ -26,7 +26,7 @@ typedef struct feal_cl_key_pair{
 typedef struct feal_cl_state_* feal_cl_state;
 
 
-feal_cl_state create_feal_cl();
+feal_cl_state create_feal_cl(void);
 void release_feal_cl(feal_cl_state);
 feal_cl_size_t feal_cl_generate_keys(feal_cl_state,feal_cl_size_t,feal_cl_plaintext_pair*,feal_cl_size_t,feal_cl_key_pair*);
 

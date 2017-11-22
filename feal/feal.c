@@ -18,11 +18,6 @@
 #include "feal.h"
 #include "fealcl.h"
 
-static ubyte rotr(ubyte a)
-  {
-    return ( (a>>2) | (a<<6) ) & 0xff;
-  }
-
 static ubyte calc_f(ubyte u, ubyte v)
   {
     int overflow;
@@ -141,7 +136,7 @@ static void *known_plaintext_attack_thread(void *arg){
 }
 
 static feal_cl_size_t known_plaintext_attack_soft(feal_cl_size_t num_pairs, feal_cl_plaintext_pair* pairs, feal_cl_size_t num_keys, feal_cl_key_pair* keys){
-	int num_proc = 1;//sysconf(_SC_NPROCESSORS_ONLN);
+	int num_proc = sysconf(_SC_NPROCESSORS_ONLN);
 	if(num_proc<0||num_proc==0||num_proc>255){
 		num_proc = 1;
 	}

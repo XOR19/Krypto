@@ -217,7 +217,7 @@ typedef struct feal_cl_state_{
 	cl_uchar4* buffer;
 }feal_cl_state_;
 
-feal_cl_state create_feal_cl(){
+feal_cl_state create_feal_cl(void){
 	HMODULE cl_lib;
 	cl_int ret;
 	cl_uint ret_num_platforms;
