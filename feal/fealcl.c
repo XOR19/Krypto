@@ -160,7 +160,7 @@ typedef struct cl_ifc {
 	clEnqueueNDRangeKernel_proc EnqueueNDRangeKernel;
 } cl_ifc;
 
-static const size_t global_item_size[3] = { 256, 256, 256 };
+static const size_t global_item_size[3] = { 128, 128, 256 };
 
 typedef struct feal_cl_state_ {
 	HMODULE cl_lib;
@@ -356,6 +356,25 @@ feal_cl_size_t feal_cl_generate_keys(feal_cl_state state,
 		outs[i].k2 = state->buffer[i].y;
 		outs[i].k3 = rol2(state->buffer[i].z);
 	}
-	return num_out;
+	int j=num_out;
+	for(i=0; i<num_out && j<num_outs; i++){
+		outs[j].k1 = outs[i].k1 | 0b10000000;
+		outs[j].k2 = outs[i].k2 | 0b10000000;
+		outs[j].k3 = outs[i].k3;
+		j++;
+		if(j>=num_outs)
+			break;
+		outs[j].k1 = outs[i].k1 | 0b10000000;
+		outs[j].k2 = outs[i].k2;
+		outs[j].k3 = outs[i].k3 ^ 0b00000010;
+		j++;
+		if(j>=num_outs)
+			break;
+		outs[j].k1 = outs[i].k1;
+		outs[j].k2 = outs[i].k2 | 0b10000000;
+		outs[j].k3 = outs[i].k3 ^ 0b00000010;
+		j++;
+	}
+	return num_out<<2;
 }
 
