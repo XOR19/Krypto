@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <time.h>
+#include <getopt.h>
 #ifdef __WIN32__
 #include <windows.h>
 #else
@@ -207,22 +208,22 @@ static feal_cl_size_t known_plaintext_attack_soft(feal_cl_size_t num_pairs,
 
 static feal_cl_size_t known_plaintext_attack(feal_cl_size_t num_pairs,
 		feal_cl_plaintext_pair* pairs, feal_cl_size_t num_keys,
-		feal_cl_key_pair* keys) {
-	feal_cl_state cl_state = create_feal_cl();
-	if (cl_state) {
-		printf("Using OpenCL\n");
-		feal_cl_size_t max_keys = feal_cl_generate_keys(cl_state, num_pairs,
-				pairs, num_keys, keys);
-		release_feal_cl(cl_state);
-		return max_keys;
-	} else {
-		printf("Using Software\n");
-		return known_plaintext_attack_soft(num_pairs, pairs, num_keys, keys);
+		feal_cl_key_pair* keys, int use_cl) {
+	if(use_cl){
+		feal_cl_state cl_state = create_feal_cl();
+		if (cl_state) {
+			feal_cl_size_t max_keys = feal_cl_generate_keys(cl_state, num_pairs,
+					pairs, num_keys, keys);
+			release_feal_cl(cl_state);
+			return max_keys;
+		}
+		printf("OpenCL not available, using Software\n");
 	}
+	return known_plaintext_attack_soft(num_pairs, pairs, num_keys, keys);
 }
 
 static feal_cl_size_t known_plaintext_attack_rand(feal_cl_size_t num_pairs,
-		feal_cl_size_t num_keys, feal_cl_key_pair* keys) {
+		feal_cl_size_t num_keys, feal_cl_key_pair* keys, int use_cl) {
 	feal_cl_plaintext_pair pairs[num_pairs];
 	int i;
 	for (i = 0; i < num_pairs; i++) {
@@ -230,24 +231,120 @@ static feal_cl_size_t known_plaintext_attack_rand(feal_cl_size_t num_pairs,
 		pairs[i].v = rand() & 0xFF;
 		pairs[i].c = calc_f(pairs[i].u, pairs[i].v);
 	}
-	return known_plaintext_attack(num_pairs, pairs, num_keys, keys);
+	return known_plaintext_attack(num_pairs, pairs, num_keys, keys, use_cl);
 }
+
+static void printhelp(const char* cmd) {
+	printf("Aufruf: %s [OPTION]...\n", cmd);
+	printf("Optionen:\n");
+	printf("  -u, --user        user send to Testserver\n");
+	printf("  -k                use known plaintext attack with x random pairs\n");
+	printf("  -a                use known plaintext attack, offline, expect pairs after options\n");
+	printf("  -c, --cl          try to use OpenCL in known plaintext attack\n");
+	printf("  -h, --help        Diese Hilfe ausgeben und beenden\n");
+	printf("  -v, --version     Versionsnummer ausgeben und beenden\n");
+	printf("\n");
+}
+
+static void printshorthelp(const char* cmd) {
+	printf("Aufruf: %s [OPTION]...\n", cmd);
+	printf("„%s --help“ liefert weitere Informationen.\n", cmd);
+}
+
+static void printversion(void) {
+	printf("feal 1.0\n");
+}
+
+const static struct option long_options[] = {
+		{ "user", required_argument, 0, 'u' },
+		{ "cl", no_argument, 0, 'c' },
+		{ "version", no_argument, 0, 'v' },
+		{ "help", no_argument, 0, 'h' },
+		{ 0, 0, 0, 0 }
+};
 
 /* --------------------------------------------------------------------------- */
 
 int main(int argc, char **argv) {
 	srand(time(NULL));
-	setUserName("c4ack1411");
-	ubyte k1, k2, k3;
-	Feal_NewKey();
+	char username[PATH_MAX] = "cr4ck1411";
 
-	feal_cl_key_pair key;
-	known_plaintext_attack_rand(10, 1, &key);
-	k1 = key.k1;
-	k2 = key.k2;
-	k3 = key.k3;
-	printf("Lösung: $%02x $%02x $%02x: %s\n", k1, k2, k3,
-			Feal_CheckKey(k1, k2, k3) ? "OK!" : "falsch");
+	int known = 0;
+	int use_cl = 0;
+
+	int opt;
+	int option_index;
+	while ((opt = getopt_long(argc, argv, "cau:k:hH?vV", long_options,
+			&option_index)) != -1) {
+
+		switch (opt) {
+		case 'u':
+			strncpy(username, optarg, sizeof(username));
+			break;
+		case 'k':
+			known = (int) strtol(optarg, NULL, 10);
+			break;
+		case 'a':
+			known = -1;
+			break;
+		case 'c':
+			use_cl = 1;
+			break;
+		case 'h':
+		case 'H':
+		case '?':
+			printhelp(argv[0]);
+			exit(0);
+		case 'v':
+		case 'V':
+			printversion();
+			exit(0);
+		}
+
+	}
+
+	if(known>=0){
+		if (optind < argc) {
+			printf("Too many arguments\n");
+			printshorthelp(argv[0]);
+			exit(1);
+		}
+		setUserName(username);
+		ubyte k1, k2, k3;
+		Feal_NewKey();
+
+		feal_cl_key_pair key;
+		if(known>0){
+			known_plaintext_attack_rand(known, 1, &key, use_cl);
+		}else{
+			choosen_plaintext_attack(1, &key);
+		}
+		k1 = key.k1;
+		k2 = key.k2;
+		k3 = key.k3;
+		printf("Lösung: $%02x $%02x $%02x: %s\n", k1, k2, k3,
+				Feal_CheckKey(k1, k2, k3) ? "OK!" : "falsch");
+	}else{
+		int rem = argc - optind;
+		if(rem%3!=0 || rem==0){
+			printf("Not valid pairs\n");
+		}
+		rem /= 3;
+		feal_cl_plaintext_pair paris[rem];
+		int i;
+		for(i=0; i<rem; i++){
+			paris[i].u = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
+			paris[i].v = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
+			paris[i].c = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
+		}
+		feal_cl_key_pair key;
+		feal_cl_size_t valid = known_plaintext_attack(rem, paris, 1, &key, use_cl);
+		if(valid){
+			printf("Lösung: $%02x $%02x $%02x von %d Keys\n", key.k1, key.k2, key.k3, valid);
+		}else{
+			printf("Keine valide Lösung");
+		}
+	}
 	return 0;
 }
 
