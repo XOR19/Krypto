@@ -17,6 +17,7 @@
 #ifdef __WIN32__
 #include <windows.h>
 #else
+#include <linux/limits.h>
 #include <unistd.h>
 #include <pthread.h>
 #endif
