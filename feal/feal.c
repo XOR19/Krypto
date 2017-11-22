@@ -60,7 +60,7 @@ static int known_plaintext_attack_soft(int* pairs) {
 	return -1;
 }
 
-int make_pair(ubyte u, ubyte v){
+static int make_pair(ubyte u, ubyte v){
 	return u | v<<8 | ror2(calc_f(u, v))<<16;
 }
 
