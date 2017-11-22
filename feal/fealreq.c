@@ -17,6 +17,8 @@
 
 #ifndef USE_UDP
 #  include <network.h>
+#elif defined(__WIN32__)
+#include<winsock2.h>
 #else
 #  include <sys/types.h>
 #  include <sys/socket.h>
@@ -93,6 +95,14 @@ static void dorequest(struct FealRequest *fr)
     DisConnect(con);
 #else
     if (s==-1) {
+#ifdef __WIN32__
+    	WSADATA wsa;
+    	if (WSAStartup(MAKEWORD(2,2),&wsa) != 0)
+    	    {
+    	        printf("Failed. Error Code : %d",WSAGetLastError());
+    	        exit(EXIT_FAILURE);
+    	    }
+#endif
       if (!(he = gethostbyname(FEALDAEMON_HOST))) {
 	fprintf(stderr,"FATAL-ERROR: Can't unknown fealdaemon servr host " FEALDAEMON_HOST ".\n");
 	exit(20);
@@ -105,17 +115,24 @@ static void dorequest(struct FealRequest *fr)
 	perror("FATAL-ERROR: Can't create socket:");
 	exit(20);
       }
+#ifdef __WIN32__
+      DWORD timeout = 30 * 1000;
+      setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+#else
       signal(SIGALRM,sig_alarm);
+#endif
     }
     if (sendto(s,(char *) fr,sizeof(*fr),0,(struct sockaddr *) &sin, sizeof(sin))<0) {
       perror("FATAL-ERROR: sendto failed");
       exit(20);
     }
-
+#ifndef __WIN32__
     alarm(5);
+#endif
     cnt=recv(s,(char *) fr,sizeof(*fr),0);
+#ifndef __WIN32__
     alarm(0);
-
+#endif
     if (cnt<0) {
       perror("FATAL-ERROR: recv failed");
       exit(20);

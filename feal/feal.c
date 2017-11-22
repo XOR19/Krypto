@@ -11,12 +11,28 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <time.h>
+#ifdef __WIN32__
+#include <windows.h>
+#else
 #include <unistd.h>
 #include <pthread.h>
-#include <stdint.h>
+#endif
 
 #include "feal.h"
 #include "fealcl.h"
+
+#ifdef __WIN32__
+typedef HANDLE pthread_mutex_t;
+#define pthread_mutex_init(MUTEX_PTR,_) ((*(MUTEX_PTR) = CreateMutex(NULL,FALSE,NULL)),0)
+#define pthread_mutex_destroy(MUTEX_PTR) (ReleaseMutex(*(MUTEX_PTR)))
+#define pthread_mutex_lock(MUTEX_PTR) (WaitForSingleObject(*(MUTEX_PTR),INFINITE))
+#define pthread_mutex_unlock(MUTEX_PTR) (ReleaseMutex(*(MUTEX_PTR)))
+typedef HANDLE pthread_t;
+#define pthread_create(THREAD_PTR,_,FUNC_PTR,ARGS) ((*(THREAD_PTR) = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE) (FUNC_PTR),(ARGS),0,NULL)),0)
+#define pthread_join(THREAD,_) (WaitForSingleObject(THREAD,INFINITE))
+#endif
 
 static ubyte calc_f(ubyte u, ubyte v)
   {
@@ -66,7 +82,8 @@ static feal_cl_size_t choosen_plaintext_attack(feal_cl_size_t num_keys, feal_cl_
 		return 4;
 	keys->k1 = 0;
 	keys->k2 = 0;
-	for(int j=0; j<7; j++){
+	int j;
+	for(j=0; j<7; j++){
 		getBit(calc_f, keys, j);
 	}
 	ubyte t1 = calc_f(keys->k1, keys->k2);
@@ -116,14 +133,16 @@ static feal_cl_ubyte rol2(feal_cl_ubyte b){
 static void *known_plaintext_attack_thread(void *arg){
 	thread_data* data = (thread_data*)arg;
 	thread_global_data* g = data->g;
-	for(uint32_t i = data->start; i<data->end; i++){
-		for(int j=0; j<g->num_pairs; j++){
+	uint32_t i;
+	int j;
+	for(i = data->start; i<data->end; i++){
+		for(j=0; j<g->num_pairs; j++){
 			uint32_t xored = g->pairs[j] ^ i;
 			if((((xored & 0xFF)+((xored>>8) & 0xFF)+1)&0xFF)!=((xored>>16) & 0xFF))
 				goto fail;
 		}
 		pthread_mutex_lock(&g->lock);
-		int j = g->num_keys++;
+		j = g->num_keys++;
 		pthread_mutex_unlock(&g->lock);
 		if(j<g->max_keys){
 			g->keys[j].k1 = i&0xFF;
@@ -136,24 +155,31 @@ static void *known_plaintext_attack_thread(void *arg){
 }
 
 static feal_cl_size_t known_plaintext_attack_soft(feal_cl_size_t num_pairs, feal_cl_plaintext_pair* pairs, feal_cl_size_t num_keys, feal_cl_key_pair* keys){
+#ifdef __WIN32__
+	SYSTEM_INFO sysinfo;
+	GetSystemInfo(&sysinfo);
+	int num_proc = sysinfo.dwNumberOfProcessors;
+#else
 	int num_proc = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
 	if(num_proc<0||num_proc==0||num_proc>255){
 		num_proc = 1;
 	}
+	int i;
 	thread_global_data g;
 	g.num_keys = 0;
 	g.max_keys = num_keys;
 	g.num_pairs = num_pairs;
 	g.keys = keys;
 	g.pairs = (uint32_t*)malloc(num_pairs * sizeof(uint32_t));
-	for(int i=0; i<num_pairs; i++){
+	for(i=0; i<num_pairs; i++){
 		g.pairs[i] = (pairs[i].u&0xFF) | ((pairs[i].v&0xFF)<<8) | ((ror2(pairs[i].c) & 0xFF)<<16);
 	}
 	pthread_mutex_init(&g.lock, NULL);
 	thread_data* thread_datas = (thread_data*)malloc(num_proc * sizeof(thread_data));
 	uint32_t t = 0;
 	uint32_t inc = 0x1000000/num_proc;
-	for(int i=0; i<num_proc; i++){
+	for(i=0; i<num_proc; i++){
 		thread_datas[i].g = &g;
 		thread_datas[i].start = t;
 		t += inc;
@@ -164,7 +190,7 @@ static feal_cl_size_t known_plaintext_attack_soft(feal_cl_size_t num_pairs, feal
 		thread_data d = {&g, t, 0x1000000, 0};
 		known_plaintext_attack_thread(&d);
 	}
-	for(int i=0; i<num_proc; i++){
+	for(i=0; i<num_proc; i++){
 		pthread_join(thread_datas[i].thread, NULL);
 	}
 	pthread_mutex_destroy(&g.lock);
@@ -187,7 +213,8 @@ static feal_cl_size_t known_plaintext_attack(feal_cl_size_t num_pairs, feal_cl_p
 
 static feal_cl_size_t known_plaintext_attack_rand(feal_cl_size_t num_pairs, feal_cl_size_t num_keys, feal_cl_key_pair* keys){
 	feal_cl_plaintext_pair pairs[num_pairs];
-	for(int i=0; i<num_pairs; i++){
+	int i;
+	for(i=0; i<num_pairs; i++){
 		pairs[i].u = rand() & 0xFF;
 		pairs[i].v = rand() & 0xFF;
 		pairs[i].c = calc_f(pairs[i].u, pairs[i].v);
