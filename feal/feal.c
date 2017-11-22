@@ -131,7 +131,7 @@ static feal_cl_ubyte rol2(feal_cl_ubyte b) {
 	return (b << 2) | (b >> 6);
 }
 
-static void *known_plaintext_attack_thread(void *arg) {
+static void *known_plaintext_attack_worker(void *arg) {
 	thread_data* data = (thread_data*) arg;
 	thread_global_data* g = data->g;
 	uint32_t i;
@@ -191,11 +191,11 @@ static feal_cl_size_t known_plaintext_attack_soft(feal_cl_size_t num_pairs,
 		t += inc;
 		thread_datas[i].end = t;
 		pthread_create(&thread_datas[i].thread, NULL,
-				known_plaintext_attack_thread, (void* )&thread_datas[i]);
+				known_plaintext_attack_worker, (void* )&thread_datas[i]);
 	}
 	if (t < 0x1000000) {
 		thread_data d = { &g, t, 0x1000000, 0 };
-		known_plaintext_attack_thread(&d);
+		known_plaintext_attack_worker(&d);
 	}
 	for (i = 0; i < num_proc; i++) {
 		pthread_join(thread_datas[i].thread, NULL);
