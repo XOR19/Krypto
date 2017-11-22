@@ -241,7 +241,9 @@ static void printhelp(const char* cmd) {
 	printf("  -u, --user        user send to Testserver\n");
 	printf("  -k                use known plaintext attack with x random pairs\n");
 	printf("  -a                use known plaintext attack, offline, expect pairs after options\n");
+	printf("  -m                use minimal, (4) choosen plaintext-cyphertex pairs\n");
 	printf("  -c, --cl          try to use OpenCL in known plaintext attack\n");
+	printf("  -t                testing\n");
 	printf("  -h, --help        Diese Hilfe ausgeben und beenden\n");
 	printf("  -v, --version     Versionsnummer ausgeben und beenden\n");
 	printf("\n");
@@ -264,6 +266,42 @@ const static struct option long_options[] = {
 		{ 0, 0, 0, 0 }
 };
 
+static void test(){
+	feal_cl_state state = create_feal_cl();
+	if(!state){
+		printf("OpenCL not available\nWe don't test with soft brutforce, that would take to long\n");
+		exit(10);
+	}
+	feal_cl_plaintext_pair pairs[4];
+	pairs[0].u = 0;
+	pairs[0].v = 0b01010101;
+	pairs[1].u = 0b01010101;
+	pairs[1].v = 0;
+	pairs[2].u = 0b10101010;
+	pairs[2].v = 0;
+	pairs[3].u = 0;
+	pairs[3].v = 0b10101010;
+	uint32_t i;
+	for(i=0; i<0x400000; i++){
+		ubyte k1 = i&0x7F;
+		ubyte k2 = (i>>7)&0x7F;
+		ubyte k3 = (i>>14)&0xFF;
+		pairs[0].c = Feal_G(k1, k2, k3, pairs[0].u, pairs[0].v);
+		pairs[1].c = Feal_G(k1, k2, k3, pairs[1].u, pairs[1].v);
+		pairs[2].c = Feal_G(k1, k2, k3, pairs[2].u, pairs[2].v);
+		pairs[3].c = Feal_G(k1, k2, k3, pairs[3].u, pairs[3].v);
+		feal_cl_size_t keys = feal_cl_generate_keys(state, 4, pairs, 0, NULL);
+		if(keys!=4){
+			printf("Bad: $%02x $%02x $%02x #keys: %d\n", k1, k2, k3, keys);
+			exit(10);
+		}
+		if((i&0xFF)==0){
+			printf("At: %06x\n", i);
+		}
+	}
+	release_feal_cl(state);
+}
+
 /* --------------------------------------------------------------------------- */
 
 int main(int argc, char **argv) {
@@ -272,10 +310,11 @@ int main(int argc, char **argv) {
 
 	int known = 0;
 	int use_cl = 0;
+	int test = 0;
 
 	int opt;
 	int option_index;
-	while ((opt = getopt_long(argc, argv, "cau:k:hH?vV", long_options,
+	while ((opt = getopt_long(argc, argv, "mtcau:k:hH?vV", long_options,
 			&option_index)) != -1) {
 
 		switch (opt) {
@@ -288,8 +327,14 @@ int main(int argc, char **argv) {
 		case 'a':
 			known = -1;
 			break;
+		case 'm':
+			known = -2;
+			break;
 		case 'c':
 			use_cl = 1;
+			break;
+		case 't':
+			test = 1;
 			break;
 		case 'h':
 		case 'H':
@@ -304,7 +349,9 @@ int main(int argc, char **argv) {
 
 	}
 
-	if(known>=0){
+	if(test){
+		test();
+	}else if(known>=0 || known==-2){
 		if (optind < argc) {
 			printf("Too many arguments\n");
 			printshorthelp(argv[0]);
@@ -316,7 +363,22 @@ int main(int argc, char **argv) {
 
 		feal_cl_key_pair key;
 		feal_cl_size_t valid;
-		if(known>0){
+		if(known==-2){
+			feal_cl_plaintext_pair pairs[4];
+			pairs[0].u = 0;
+			pairs[0].v = 0b01010101;
+			pairs[1].u = 0b01010101;
+			pairs[1].v = 0;
+			pairs[2].u = 0b10101010;
+			pairs[2].v = 0;
+			pairs[3].u = 0;
+			pairs[3].v = 0b10101010;
+			pairs[0].c = calc_f(pairs[0].u, pairs[0].v);
+			pairs[1].c = calc_f(pairs[1].u, pairs[1].v);
+			pairs[2].c = calc_f(pairs[2].u, pairs[2].v);
+			pairs[3].c = calc_f(pairs[3].u, pairs[3].v);
+			valid = known_plaintext_attack(4, pairs, 1, &key, use_cl);
+		}else if(known>0){
 			valid = known_plaintext_attack_rand(known, 1, &key, use_cl);
 		}else{
 			valid = choosen_plaintext_attack(1, &key);
@@ -336,15 +398,15 @@ int main(int argc, char **argv) {
 			printf("Not valid pairs\n");
 		}
 		rem /= 3;
-		feal_cl_plaintext_pair paris[rem];
+		feal_cl_plaintext_pair pairs[rem];
 		int i;
 		for(i=0; i<rem; i++){
-			paris[i].u = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
-			paris[i].v = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
-			paris[i].c = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
+			pairs[i].u = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
+			pairs[i].v = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
+			pairs[i].c = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
 		}
 		feal_cl_key_pair key;
-		feal_cl_size_t valid = known_plaintext_attack(rem, paris, 1, &key, use_cl);
+		feal_cl_size_t valid = known_plaintext_attack(rem, pairs, 1, &key, use_cl);
 		if(valid){
 			printf("Lösung: $%02x $%02x $%02x von %d Keys\n", key.k1, key.k2, key.k3, valid);
 		}else{
