@@ -27,7 +27,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include <network.h> /* nur fuer MakeNetName */
+static const char* gUsername;
 
 /*#define TRACE*/ /* Trace aller Kommunikation mit dem Server */
 
@@ -62,9 +62,7 @@ static void dorequest(struct FealRequest *fr)
     static const char *cmdtxt[] = { "NewKey","Cipher","Check","GetCount","Max","Vector" };
 #endif
 
-    char *un;
-    un= MakeNetName(NULL);
-    strncpy(fr->username,un,USERNAMELEN-1);
+    strncpy(fr->username,gUsername,USERNAMELEN-1);
     fr->username[USERNAMELEN-1]=0;
 
 #ifdef TRACE
@@ -233,3 +231,7 @@ int Feal_GetMaxCount(void)
 
     return fr.res;
   }
+
+void setUserName(const char* username){
+	gUsername = username;
+}

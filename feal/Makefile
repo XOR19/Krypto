@@ -15,6 +15,7 @@ feal:	feal.o	fealreq.o
 feal.o:		feal.c		feal.h
 fealreq.o:	fealreq.c       feal.h	feal_privat.h
 
+all: feal
 
 #------------------------------------------------------------------------------
 

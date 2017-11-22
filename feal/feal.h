@@ -53,3 +53,4 @@ int   Feal_CheckKey    (ubyte k1, ubyte k2, ubyte k3);
 void  Feal_NewKey      (void);
 int   Feal_GetCount    (void);
 int   Feal_GetMaxCount (void);
+void setUserName(const char* username);
