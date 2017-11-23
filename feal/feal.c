@@ -41,19 +41,20 @@ static int known_plaintext_attack_soft(int* pairs) {
 	int l;
 	int m;
 	int j;
-	for (i = 0; i < 0x100; i++) {
-		for(l=0; l<0x80; l++){
-			for(m=0; m<0x80; m++){
-				int k = i<<16 | l<<8 | m;
-				for (j = 0; j < 4; j++) {
-					int xored = pairs[j] ^ k;
-					if ((((xored & 0xFF) + ((xored >> 8) & 0xFF) + 1) & 0xFF)
-							!= ((xored >> 16) & 0xFF))
-						goto fail;
-				}
-				return k;
-				fail: ;
+	for(l=0; l<0x80; l++){
+		for(m=0; m<0x80; m++){
+			int k = l<<8 | m;
+			int xored = pairs[0] ^ k;
+			i = (((xored & 0xFF) + ((xored >> 8) & 0xFF) + 1) ^ (xored >> 16)) & 0xFF;
+			k |= i<<16;
+			for (j = 1; j < 4; j++) {
+				int xored = pairs[j] ^ k;
+				if ((((xored & 0xFF) + ((xored >> 8) & 0xFF) + 1) & 0xFF)
+						!= ((xored >> 16) & 0xFF))
+					goto fail;
 			}
+			return k;
+			fail: ;
 		}
 	}
 	// should not reach
@@ -65,6 +66,8 @@ static int make_pair(ubyte u, ubyte v){
 }
 
 /* --------------------------------------------------------------------------- */
+
+#include <time.h>
 
 int main(int argc, char **argv) {
 	setUserName("cr4ck1411");

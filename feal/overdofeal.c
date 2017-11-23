@@ -19,26 +19,25 @@
 #else
 #include <linux/limits.h>
 #include <unistd.h>
-#include <pthread.h>
 #endif
 
 #include "feal.h"
-#include "fealcl.h"
 
-#ifdef __WIN32__
-typedef HANDLE pthread_mutex_t;
-#define pthread_mutex_init(MUTEX_PTR,_) ((*(MUTEX_PTR) = CreateMutex(NULL,FALSE,NULL)),0)
-#define pthread_mutex_destroy(MUTEX_PTR) (ReleaseMutex(*(MUTEX_PTR)))
-#define pthread_mutex_lock(MUTEX_PTR) (WaitForSingleObject(*(MUTEX_PTR),INFINITE))
-#define pthread_mutex_unlock(MUTEX_PTR) (ReleaseMutex(*(MUTEX_PTR)))
-typedef HANDLE pthread_t;
-#define pthread_create(THREAD_PTR,_,FUNC_PTR,ARGS) ((*(THREAD_PTR) = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE) (FUNC_PTR),(ARGS),0,NULL)),0)
-#define pthread_join(THREAD,_) (WaitForSingleObject(THREAD,INFINITE))
-#endif
+typedef struct feal_plaintext_pair {
+	uint8_t u;
+	uint8_t v;
+	uint8_t c;
+} feal_plaintext_pair;
 
-static ubyte calc_f(ubyte u, ubyte v) {
+typedef struct feal_key_pair {
+	uint8_t k1;
+	uint8_t k2;
+	uint8_t k3;
+} feal_key_pair;
+
+static uint8_t calc_f(uint8_t u, uint8_t v) {
 	int overflow;
-	ubyte r;
+	uint8_t r;
 
 	r = Feal_GS(u, v, &overflow);
 	if (overflow) {
@@ -49,17 +48,17 @@ static ubyte calc_f(ubyte u, ubyte v) {
 	return r;
 }
 
-static void getBit(ubyte (*Feal_Gs)(ubyte, ubyte), feal_cl_key_pair* keys,
-		ubyte bit) {
-	ubyte mask = 1 << bit;
-	ubyte t1 = Feal_Gs(keys->k1, keys->k2);
-	ubyte t2 = Feal_Gs(keys->k1, keys->k2 ^ mask);
-	ubyte t3 = Feal_Gs(keys->k1 ^ mask, keys->k2 ^ mask);
+static void getBit(uint8_t (*Feal_Gs)(uint8_t, uint8_t), feal_key_pair* keys,
+		uint8_t bit) {
+	uint8_t mask = 1 << bit;
+	uint8_t t1 = Feal_Gs(keys->k1, keys->k2);
+	uint8_t t2 = Feal_Gs(keys->k1, keys->k2 ^ mask);
+	uint8_t t3 = Feal_Gs(keys->k1 ^ mask, keys->k2 ^ mask);
 	mask = mask << 3 | mask >> 5;
-	ubyte b14 = t1 & mask;
-	ubyte b24 = t2 & mask;
-	ubyte b34 = t3 & mask;
-	ubyte type;
+	uint8_t b14 = t1 & mask;
+	uint8_t b24 = t2 & mask;
+	uint8_t b34 = t3 & mask;
+	uint8_t type;
 	if (b14 == b24) {
 		if (b14 == b34) {
 			type = 0b10;
@@ -79,8 +78,8 @@ static void getBit(ubyte (*Feal_Gs)(ubyte, ubyte), feal_cl_key_pair* keys,
 	keys->k2 |= ((type >> 1) & 1) << bit;
 }
 
-static feal_cl_size_t choosen_plaintext_attack(feal_cl_size_t num_keys,
-		feal_cl_key_pair* keys) {
+static uint32_t choosen_plaintext_attack(uint32_t num_keys,
+		feal_key_pair* keys) {
 	if (num_keys <= 0)
 		return 4;
 	keys->k1 = 0;
@@ -109,110 +108,50 @@ static feal_cl_size_t choosen_plaintext_attack(feal_cl_size_t num_keys,
 	return 4;
 }
 
-typedef struct {
-	feal_cl_size_t num_keys;
-	feal_cl_size_t max_keys;
-	feal_cl_key_pair* keys;
-	feal_cl_size_t num_pairs;
-	uint32_t* pairs;
-	pthread_mutex_t lock;
-} thread_global_data;
-
-typedef struct {
-	thread_global_data* g;
-	uint32_t start;
-	uint32_t end;
-	pthread_t thread;
-} thread_data;
-
-static feal_cl_ubyte ror2(feal_cl_ubyte b) {
+static ubyte ror2(ubyte b) {
 	return (b << 6) | (b >> 2);
 }
 
-static feal_cl_ubyte rol2(feal_cl_ubyte b) {
+static ubyte rol2(ubyte b) {
 	return (b << 2) | (b >> 6);
 }
 
-static void *known_plaintext_attack_worker(void *arg) {
-	thread_data* data = (thread_data*) arg;
-	thread_global_data* g = data->g;
+static uint32_t known_plaintext_attack(uint32_t num_pairs,
+		feal_plaintext_pair* pairs, uint32_t num_keys,
+		feal_key_pair* keys) {
+	uint32_t found_keys = 0;
 	int i;
 	int l;
 	int m;
-	int j;
-	for (i = data->start; i < data->end; i++) {
-		for(l=0; l<0x80; l++){
-			for(m=0; m<0x80; m++){
-				int k = i<<16 | l<<8 | m;
-				for (j = 0; j < g->num_pairs; j++) {
-					uint32_t xored = g->pairs[j] ^ k;
-					if ((((xored & 0xFF) + ((xored >> 8) & 0xFF) + 1) & 0xFF)
-							!= ((xored >> 16) & 0xFF))
-						goto fail;
-				}
-				pthread_mutex_lock(&g->lock);
-				j = g->num_keys++;
-				pthread_mutex_unlock(&g->lock);
-				if (j < g->max_keys) {
-					g->keys[j].k1 = m;
-					g->keys[j].k2 = l;
-					g->keys[j].k3 = rol2(i);
-				}
-				fail: ;
+	uint32_t j;
+	uint32_t* p = (uint32_t*)malloc(num_pairs * sizeof(uint32_t));
+	for(j=0; j<num_pairs; j++){
+		p[j] = pairs[j].u | pairs[j].v<<8 | ror2(pairs[j].c)<<16;
+	}
+	for(l=0; l<0x80; l++){
+		for(m=0; m<0x80; m++){
+			uint32_t k = l<<8 | m;
+			uint32_t xored = p[0] ^ k;
+			i = (((xored & 0xFF) + ((xored >> 8) & 0xFF) + 1) ^ (xored >> 16)) & 0xFF;
+			k |= i<<16;
+			for (j = 1; j < num_pairs; j++) {
+				xored = p[j] ^ k;
+				if ((((xored & 0xFF) + ((xored >> 8) & 0xFF) + 1) & 0xFF)
+						!= ((xored >> 16) & 0xFF))
+					goto fail;
 			}
+			if(found_keys<num_keys){
+				keys[found_keys].k1 = m;
+				keys[found_keys].k2 = l;
+				keys[found_keys].k3 = rol2(i);
+			}
+			found_keys++;
+			fail: ;
 		}
 	}
-	return 0;
-}
-
-static feal_cl_size_t known_plaintext_attack_soft(feal_cl_size_t num_pairs,
-		feal_cl_plaintext_pair* pairs, feal_cl_size_t num_keys,
-		feal_cl_key_pair* keys) {
-#ifdef __WIN32__
-	SYSTEM_INFO sysinfo;
-	GetSystemInfo(&sysinfo);
-	int num_proc = sysinfo.dwNumberOfProcessors;
-#else
-	int num_proc = sysconf(_SC_NPROCESSORS_ONLN);
-#endif
-	if (num_proc < 0 || num_proc == 0 || num_proc > 255) {
-		num_proc = 1;
-	}
-	int i;
-	thread_global_data g;
-	g.num_keys = 0;
-	g.max_keys = num_keys;
-	g.num_pairs = num_pairs;
-	g.keys = keys;
-	g.pairs = (uint32_t*) malloc(num_pairs * sizeof(uint32_t));
-	for (i = 0; i < num_pairs; i++) {
-		g.pairs[i] = (pairs[i].u & 0xFF) | ((pairs[i].v & 0xFF) << 8)
-				| ((ror2(pairs[i].c) & 0xFF) << 16);
-	}
-	pthread_mutex_init(&g.lock, NULL);
-	thread_data* thread_datas = (thread_data*) malloc(
-			num_proc * sizeof(thread_data));
-	uint32_t t = 0;
-	uint32_t inc = 256 / num_proc;
-	for (i = 0; i < num_proc; i++) {
-		thread_datas[i].g = &g;
-		thread_datas[i].start = t;
-		t += inc;
-		thread_datas[i].end = t;
-		pthread_create(&thread_datas[i].thread, NULL,
-				known_plaintext_attack_worker, (void* )&thread_datas[i]);
-	}
-	if (t < 256) {
-		thread_data d = { &g, t, 256, 0 };
-		known_plaintext_attack_worker(&d);
-	}
-	for (i = 0; i < num_proc; i++) {
-		pthread_join(thread_datas[i].thread, NULL);
-	}
-	pthread_mutex_destroy(&g.lock);
-	free(thread_datas);
-	int j=g.num_keys;
-	for(i=0; i<g.num_keys && j<num_keys; i++){
+	free(p);
+	j=found_keys;
+	for(i=0; i<found_keys && j<num_keys; i++){
 		keys[j].k1 = keys[i].k1 | 0b10000000;
 		keys[j].k2 = keys[i].k2 | 0b10000000;
 		keys[j].k3 = keys[i].k3;
@@ -230,35 +169,50 @@ static feal_cl_size_t known_plaintext_attack_soft(feal_cl_size_t num_pairs,
 		keys[j].k3 = keys[i].k3 ^ 0b00000010;
 		j++;
 	}
-	return g.num_keys<<2;
+	return found_keys<<2;
 }
 
-static feal_cl_size_t known_plaintext_attack(feal_cl_size_t num_pairs,
-		feal_cl_plaintext_pair* pairs, feal_cl_size_t num_keys,
-		feal_cl_key_pair* keys, int use_cl) {
-	if(use_cl){
-		feal_cl_state cl_state = create_feal_cl();
-		if (cl_state) {
-			feal_cl_size_t max_keys = feal_cl_generate_keys(cl_state, num_pairs,
-					pairs, num_keys, keys);
-			release_feal_cl(cl_state);
-			return max_keys;
-		}
-		printf("OpenCL not available, using Software\n");
-	}
-	return known_plaintext_attack_soft(num_pairs, pairs, num_keys, keys);
-}
-
-static feal_cl_size_t known_plaintext_attack_rand(feal_cl_size_t num_pairs,
-		feal_cl_size_t num_keys, feal_cl_key_pair* keys, int use_cl) {
-	feal_cl_plaintext_pair pairs[num_pairs];
+static feal_key_pair known_plaintext_attack4(feal_plaintext_pair* pairs) {
 	int i;
+	int l;
+	int m;
+	uint32_t j;
+	uint32_t p[4];
+	for(j=0; j<4; j++){
+		p[j] = pairs[j].u | pairs[j].v<<8 | ror2(pairs[j].c)<<16;
+	}
+	for(l=0; l<0x80; l++){
+		for(m=0; m<0x80; m++){
+			uint32_t k = l<<8 | m;
+			uint32_t xored = p[0] ^ k;
+			i = (((xored & 0xFF) + ((xored >> 8) & 0xFF) + 1) ^ (xored >> 16)) & 0xFF;
+			k |= i<<16;
+			for (j = 1; j < 4; j++) {
+				xored = p[j] ^ k;
+				if ((((xored & 0xFF) + ((xored >> 8) & 0xFF) + 1) & 0xFF)
+						!= ((xored >> 16) & 0xFF))
+					goto fail;
+			}
+			feal_key_pair ret = {m, l, rol2(i)};
+			return ret;
+			fail: ;
+		}
+	}
+	// should not reach here
+	feal_key_pair ret = {0, 0, 0};
+	return ret;
+}
+
+static uint32_t known_plaintext_attack_rand(uint32_t num_pairs,
+		uint32_t num_keys, feal_key_pair* keys) {
+	feal_plaintext_pair pairs[num_pairs];
+	uint32_t i;
 	for (i = 0; i < num_pairs; i++) {
 		pairs[i].u = rand() & 0xFF;
 		pairs[i].v = rand() & 0xFF;
 		pairs[i].c = calc_f(pairs[i].u, pairs[i].v);
 	}
-	return known_plaintext_attack(num_pairs, pairs, num_keys, keys, use_cl);
+	return known_plaintext_attack(num_pairs, pairs, num_keys, keys);
 }
 
 static void printhelp(const char* cmd) {
@@ -268,7 +222,6 @@ static void printhelp(const char* cmd) {
 	printf("  -k                use known plaintext attack with x random pairs\n");
 	printf("  -a                use known plaintext attack, offline, expect pairs after options\n");
 	printf("  -m                use minimal, (4) choosen plaintext-cyphertex pairs\n");
-	printf("  -c, --cl          try to use OpenCL in known plaintext attack\n");
 	printf("  -t                testing\n");
 	printf("  -h, --help        Diese Hilfe ausgeben und beenden\n");
 	printf("  -v, --version     Versionsnummer ausgeben und beenden\n");
@@ -286,19 +239,13 @@ static void printversion(void) {
 
 const static struct option long_options[] = {
 		{ "user", required_argument, 0, 'u' },
-		{ "cl", no_argument, 0, 'c' },
 		{ "version", no_argument, 0, 'v' },
 		{ "help", no_argument, 0, 'h' },
 		{ 0, 0, 0, 0 }
 };
 
 static void test(void){
-	feal_cl_state state = create_feal_cl();
-	if(!state){
-		printf("OpenCL not available\nWe don't test with soft brutforce, that would take to long\n");
-		exit(10);
-	}
-	feal_cl_plaintext_pair pairs[4];
+	feal_plaintext_pair pairs[4];
 	pairs[0].u = 0;
 	pairs[0].v = 0b01010101;
 	pairs[1].u = 0b01010101;
@@ -309,14 +256,14 @@ static void test(void){
 	pairs[3].v = 0b10101010;
 	uint32_t i;
 	for(i=0; i<0x400000; i++){
-		ubyte k1 = i&0x7F;
-		ubyte k2 = (i>>7)&0x7F;
-		ubyte k3 = (i>>14)&0xFF;
+		uint8_t k1 = i&0x7F;
+		uint8_t k2 = (i>>7)&0x7F;
+		uint8_t k3 = (i>>14)&0xFF;
 		pairs[0].c = Feal_G(k1, k2, k3, pairs[0].u, pairs[0].v);
 		pairs[1].c = Feal_G(k1, k2, k3, pairs[1].u, pairs[1].v);
 		pairs[2].c = Feal_G(k1, k2, k3, pairs[2].u, pairs[2].v);
 		pairs[3].c = Feal_G(k1, k2, k3, pairs[3].u, pairs[3].v);
-		feal_cl_size_t keys = feal_cl_generate_keys(state, 4, pairs, 0, NULL);
+		uint32_t keys = known_plaintext_attack(4, pairs, 0, NULL);
 		if(keys!=4){
 			printf("Bad: $%02x $%02x $%02x #keys: %d\n", k1, k2, k3, keys);
 			exit(10);
@@ -325,7 +272,6 @@ static void test(void){
 			printf("At: %06x\n", i);
 		}
 	}
-	release_feal_cl(state);
 }
 
 /* --------------------------------------------------------------------------- */
@@ -337,12 +283,11 @@ int _main(int argc, char **argv) {
 	char username[PATH_MAX] = "cr4ck1411";
 
 	int known = 0;
-	int use_cl = 0;
 	int do_test = 0;
 
 	int opt;
 	int option_index;
-	while ((opt = getopt_long(argc, argv, "mtcau:k:hH?vV", long_options,
+	while ((opt = getopt_long(argc, argv, "mtau:k:hH?vV", long_options,
 			&option_index)) != -1) {
 
 		switch (opt) {
@@ -357,9 +302,6 @@ int _main(int argc, char **argv) {
 			break;
 		case 'm':
 			known = -2;
-			break;
-		case 'c':
-			use_cl = 1;
 			break;
 		case 't':
 			do_test = 1;
@@ -386,13 +328,13 @@ int _main(int argc, char **argv) {
 			exit(1);
 		}
 		setUserName(username);
-		ubyte k1, k2, k3;
+		uint8_t k1, k2, k3;
 		Feal_NewKey();
 
-		feal_cl_key_pair key;
-		feal_cl_size_t valid;
+		feal_key_pair key;
+		uint32_t valid;
 		if(known==-2){
-			feal_cl_plaintext_pair pairs[4];
+			feal_plaintext_pair pairs[4];
 			pairs[0].u = 0;
 			pairs[0].v = 0b01010101;
 			pairs[1].u = 0b01010101;
@@ -405,9 +347,10 @@ int _main(int argc, char **argv) {
 			pairs[1].c = calc_f(pairs[1].u, pairs[1].v);
 			pairs[2].c = calc_f(pairs[2].u, pairs[2].v);
 			pairs[3].c = calc_f(pairs[3].u, pairs[3].v);
-			valid = known_plaintext_attack(4, pairs, 1, &key, use_cl);
+			key = known_plaintext_attack4(pairs);
+			valid = 4;
 		}else if(known>0){
-			valid = known_plaintext_attack_rand(known, 1, &key, use_cl);
+			valid = known_plaintext_attack_rand(known, 1, &key);
 		}else{
 			valid = choosen_plaintext_attack(1, &key);
 		}
@@ -426,15 +369,15 @@ int _main(int argc, char **argv) {
 			printf("Not valid pairs\n");
 		}
 		rem /= 3;
-		feal_cl_plaintext_pair pairs[rem];
+		feal_plaintext_pair pairs[rem];
 		int i;
 		for(i=0; i<rem; i++){
-			pairs[i].u = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
-			pairs[i].v = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
-			pairs[i].c = (feal_cl_ubyte) strtol(argv[optind++], NULL, 16);
+			pairs[i].u = (uint8_t) strtol(argv[optind++], NULL, 16);
+			pairs[i].v = (uint8_t) strtol(argv[optind++], NULL, 16);
+			pairs[i].c = (uint8_t) strtol(argv[optind++], NULL, 16);
 		}
-		feal_cl_key_pair key;
-		feal_cl_size_t valid = known_plaintext_attack(rem, pairs, 1, &key, use_cl);
+		feal_key_pair key;
+		uint32_t valid = known_plaintext_attack(rem, pairs, 1, &key);
 		if(valid){
 			printf("Lösung: $%02x $%02x $%02x von %d Keys\n", key.k1, key.k2, key.k3, valid);
 		}else{

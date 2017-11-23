@@ -9,12 +9,11 @@
 
 include $(PRAKTROOT)/include/Makefile.Settings
 
-feal:	feal.o	fealreq.o fealcl.o
-	$(CC) -o feal feal.o fealreq.o fealcl.o $(LFLAGS) -ldl -lpthread
+feal:	feal.o	fealreq.o
+	$(CC) -o feal feal.o fealreq.o $(LFLAGS)
 
 feal.o:		feal.c		feal.h
 fealreq.o:	fealreq.c       feal.h	feal_privat.h
-fealcl.o: fealcl.c
 
 all: feal
 
