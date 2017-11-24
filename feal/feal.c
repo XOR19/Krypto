@@ -67,8 +67,6 @@ static int make_pair(ubyte u, ubyte v){
 
 /* --------------------------------------------------------------------------- */
 
-#include <time.h>
-
 int main(int argc, char **argv) {
 	setUserName("cr4ck1411");
 
