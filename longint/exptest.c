@@ -14,7 +14,6 @@
 #include <stdlib.h>
 
 #include <praktikum.h>
-#include <longint.h>
 
 #include "versuch.h"
 
@@ -57,36 +56,39 @@ struct {
 
 int main(int argc, char **argv)
 {
-  longnum x,y,p,r1,r2;
+	mpz_t x,y,p,r1,r2;
   int i;
+
+  mpz_inits(x,y,p,r1,r2,NULL);
 
   for (i=0; i<TABSIZE(TestData); i++) {
 
-    LHex2Long(TestData[i].x,&x);
-    LHex2Long(TestData[i].y,&y);
-    LHex2Long(TestData[i].p,&p);
-    LHex2Long(TestData[i].z,&r1);
+	  mpz_set_str(x, TestData[i].x, 16);
+	  mpz_set_str(y, TestData[i].y, 16);
+	  mpz_set_str(p, TestData[i].p, 16);
+	  mpz_set_str(r1, TestData[i].z, 16);
 
-    doexp(&x,&y,&r2,&p);
+    doexp(x,y,r2,p);
 
-    if (LCompare(&r1,&r2)) {
+    if (mpz_cmp(r1,r2)) {
       printf("Ergebnisse differieren bei Test %d:\n",i+1);
-      printf("  x = %s\n",LLong2Hex(&x,NULL,0,0));
-      printf("  y = %s\n",LLong2Hex(&y,NULL,0,0));
-      printf("  p = %s\n",LLong2Hex(&p,NULL,0,0));
-      printf(" r1 = %s\n",LLong2Hex(&r1,NULL,0,0));
-      printf(" r2 = %s\n",LLong2Hex(&r2,NULL,0,0));
+      gmp_printf("  x = %Zd\n",x);
+      gmp_printf("  y = %Zd\n",y);
+      gmp_printf("  p = %Zd\n",p);
+      gmp_printf(" r1 = %Zd\n",r1);
+      gmp_printf(" r2 = %Zd\n",r2);
     }else {
       printf("Ergebnisse sind korrekt\n");}
 
   }
 
-  LInt2Long(2, &x);
-  LInt2Long(3, &y);
-  doexp(&x,&y,&r2,&p);
-  ULONG result;
-  LLong2Int(&result, &r2);
+  mpz_set_ui(x, 2);
+  mpz_set_ui(y, 3);
+  doexp(x,y,r2,p);
+  ULONG result = mpz_get_ui(r2);
   printf("doexp(2,3) = %d\n", result);
+
+  mpz_clears(x,y,p,r1,r2,NULL);
 
   return 0;
 }

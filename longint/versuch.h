@@ -12,7 +12,7 @@
 **/
 
 
-extern void doexp(const_longnum_ptr x,const_longnum_ptr y,longnum_ptr z, const_longnum_ptr p);
+extern void doexp(const mpz_t x,const mpz_t y,mpz_t z, const mpz_t p);
 
 typedef enum { DIRECTION_AliceBob,DIRECTION_BobAlice } Direction_Typ;
 typedef enum { PACKETTYPE_Auth, PACKETTYPE_Data } Packet_Typ;
@@ -25,7 +25,7 @@ typedef struct {
   Direction_Typ direction; /* Richtung: Alice-->Bob,  Bob-->Alice */
   int seqcount;            /* laufende Paketnummer */
   Packet_Typ tp;           /* Paket-Typ */
-  longnum number;          /* Bei tp==Auth: Authentifikationsdaten in Form einer Langzahl */
+  UBYTE number[MPZLEN];          /* Bei tp==Auth: Authentifikationsdaten in Form einer Langzahl */
   Data_Typ data;           /* Bei tp==Data: Nutzdaten in Form eines chiffrierten Strings */
   int len;                 /*               Anzahl der gültigen Zeichen in DATA */
 } Packet;

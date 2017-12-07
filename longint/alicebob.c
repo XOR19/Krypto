@@ -15,7 +15,6 @@
 #include <stdlib.h>
 #include <praktikum.h>
 #include <network.h>
-#include <longint.h>
 
 #include "versuch.h"
 
@@ -33,10 +32,11 @@ const char *s_wb = PUBLIC_DATA_wb;
  *    Funktionen EnCryptStr und DeCryptStr geeignet ist.
  */
 
-static void SetKey(const_longnum_ptr num, CipherKey *ck)
+static void SetKey(mpz_t num, CipherKey *ck)
   {
-    DES_GenKeys(num->data.b,0,ck->ikey);
-    memcpy(ck->iv,num->data.b+DES_DATA_WIDTH,DES_DATA_WIDTH);
+	UBYTE* b = mpz_t2Ubyte(num, MPZLEN);
+    DES_GenKeys(b,0,ck->ikey);
+    memcpy(ck->iv,b+DES_DATA_WIDTH,DES_DATA_WIDTH);
   }
 
 
@@ -83,13 +83,13 @@ int main(int argc, char **argv)
   Connection con;
   char *name1,*name2;
   int cnt;
-  longnum p,w,wa,wb;  /* die globalen Langzahlen in Langzahl-Form */
+  mpz_t p,w,wa,wb;  /* die globalen Langzahlen in Langzahl-Form */
 
   /* Langzahlarithmetik initialisieren und Konstanten wandeln */
-  LHex2Long(s_p,&p);
-  LHex2Long(s_w,&w);
-  LHex2Long(s_wa,&wa);
-  LHex2Long(s_wb,&wb);
+  mpz_init_set_str(p, s_p, 16);
+  mpz_init_set_str(w, s_w, 16);
+  mpz_init_set_str(wa, s_wa, 16);
+  mpz_init_set_str(wb, s_wb, 16);
 
 
   /*----  Aufbau der Verbindung zum Alice/Bob-Daemon  ----*/
@@ -126,7 +126,7 @@ int main(int argc, char **argv)
       printf("%s (%2d) ",pkt.direction == DIRECTION_AliceBob ? "Alice->Bob " : "Bob->Alice ",pkt.seqcount);
 
       if (pkt.tp==PACKETTYPE_Auth) {
-	printf("AUTH %s\n",LLong2Hex(&pkt.number,NULL,0,0));
+	//printf("AUTH %s\n",LLong2Hex(&pkt.number,NULL,0,0));
       }
       else {
 	printf("DATA "); printstring(pkt.data,pkt.len); printf("\n");
@@ -137,6 +137,7 @@ int main(int argc, char **argv)
   }
   while (cnt==sizeof(pkt));
   DisConnect(con);
+  mpz_clears(p, w, wa, wb);
   return 0;
 }
 

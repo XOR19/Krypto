@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <praktikum.h>
-#include <longint.h>
 
 #include "versuch.h"
 
@@ -29,7 +28,18 @@
  */
 
 
-void doexp(const_longnum_ptr x,const_longnum_ptr y,longnum_ptr z, const_longnum_ptr p)
+void doexp(const mpz_t x,const mpz_t y,mpz_t z, const mpz_t p)
   {
-  	//TODO
+	mpz_set_ui(z, 1);
+	mp_bitcnt_t bit=2048;
+
+	while(bit--){
+		mpz_mul(z, z, z);
+		mpz_mod(z, z, p);
+		int b = mpz_tstbit(y, bit);
+		if(b){
+			mpz_mul(z, z, x);
+			mpz_mod(z, z, p);
+		}
+	}
   }
