@@ -30,16 +30,37 @@
 
 void doexp(const mpz_t x,const mpz_t y,mpz_t z, const mpz_t p)
   {
-	mpz_set_ui(z, 1);
-	mp_bitcnt_t bit=2048;
+	if(mpz_cmp_ui(x, 1) || mpz_cmp_ui(y, 0)){
+		mpz_set_ui(z, 1);
+		return;
+	}
+	if(mpz_cmp_ui(x, 0)){
+		mpz_set_ui(z, 0);
+		return;
+	}
+	
+	mpz_t r;
+	int alloc;
+	alloc = x==z || y==z || p==z;
+	if(alloc){
+		mpz_init_set_ui(r, 1);
+	}else{
+		r = z;
+		mpz_set_ui(r, 1);
+	}
+	mp_bitcnt_t bit=mpz_sizeinbase(y, 2);
 
 	while(bit--){
-		mpz_mul(z, z, z);
-		mpz_mod(z, z, p);
+		mpz_mul(r, r, r);
+		mpz_mod(r, r, p);
 		int b = mpz_tstbit(y, bit);
 		if(b){
-			mpz_mul(z, z, x);
-			mpz_mod(z, z, p);
+			mpz_mul(r, r, x);
+			mpz_mod(r, r, p);
 		}
 	}
-  }
+	if(alloc){
+		mpz_set(z, r);
+		mpz_clear(r);
+	}
+}
