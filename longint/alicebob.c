@@ -75,6 +75,26 @@ static void printstring(const char *s,int len)
     }
   }
 
+static void packet2mpz(mpz_t ret, Packet* pkt){
+	// FIXME DON'T KNOW HOW TO CONVERT
+}
+
+static void printAndChange(Packet* pkt){
+	printf("DATA "); printstring(pkt->data,pkt->len); printf("\n");
+}
+
+static int is_valid_packet(Packet* pkt){
+	if(pkt->direction!=DIRECTION_AliceBob && pkt->direction!=DIRECTION_BobAlice)
+		return 0;
+	if(pkt->tp!=PACKETTYPE_Auth && pkt->tp!=PACKETTYPE_Data)
+		return 0;
+	if(pkt->tp==PACKETTYPE_Data){
+		if(pkt->len<0 || pkt->len>sizeof(pkt->data))
+			return 0;
+	}
+	return 1;
+}
+
 /* ------------------------------------------------------------------------- */
 
 int main(int argc, char **argv)
@@ -84,13 +104,17 @@ int main(int argc, char **argv)
   char *name1,*name2;
   int cnt;
   mpz_t p,w,wa,wb;  /* die globalen Langzahlen in Langzahl-Form */
+  mpz_t pkt_num,a,b;
+  CipherKey key[4]; // Incoming+Outgoing in both directions
 
   /* Langzahlarithmetik initialisieren und Konstanten wandeln */
   mpz_init_set_str(p, s_p, 16);
   mpz_init_set_str(w, s_w, 16);
   mpz_init_set_str(wa, s_wa, 16);
   mpz_init_set_str(wb, s_wb, 16);
-
+  mpz_init_set_ui(a, 11); // TODO precalculate
+  mpz_init_set_ui(b, 13); // TODO precalculate
+  mpz_init(pkt_num);
 
   /*----  Aufbau der Verbindung zum Alice/Bob-Daemon  ----*/
   name1 = MakeNetName("AliceBob");
@@ -110,34 +134,44 @@ int main(int argc, char **argv)
   /*
    * WICHTIGER HINWEIS: Auf der Netzwerkverbindung CON werden alle Pakete
    *    angeliefert, die Alice und Bob austauschen. Die Paketrichtung ist im
-   *    direction-Feld angegeben. Das Paket muß explizit weiter transportiert
-   *    werden. Außerdem ist zu beachten, daß die Kommunikation nur dann
+   *    direction-Feld angegeben. Das Paket muÃŸ explizit weiter transportiert
+   *    werden. AuÃŸerdem ist zu beachten, daÃŸ die Kommunikation nur dann
    *    korrekt funktionier, wenn Alice und Bob immer abwechselnd senden.
-   *    Das Unterschlagen eines Paketes führt also zu einem Hänger!
+   *    Das Unterschlagen eines Paketes fÃ¼hrt also zu einem HÃ¤nger!
    *
    * Der folgende Programmrahmen zeigt alle abgefangenen Pakete an und
-   * leitet sie anschließend korrekt weiter.
+   * leitet sie anschlieÃŸend korrekt weiter.
    */
 
-  do { /* Schleife über alle Nachrichten ... */
+  do { /* Schleife Ã¼ber alle Nachrichten ... */
     cnt = Receive(con,&pkt,sizeof(pkt));
     if (cnt==sizeof(pkt)) {
 
-      printf("%s (%2d) ",pkt.direction == DIRECTION_AliceBob ? "Alice->Bob " : "Bob->Alice ",pkt.seqcount);
-
-      if (pkt.tp==PACKETTYPE_Auth) {
-	//printf("AUTH %s\n",LLong2Hex(&pkt.number,NULL,0,0));
-      }
-      else {
-	printf("DATA "); printstring(pkt.data,pkt.len); printf("\n");
-      }
+    	if(!is_valid_packet(&pkt)){
+    		printf("!!! INVALID PACKET !!!\n");
+    	}else{
+		  printf("%s (%2d) ",pkt.direction == DIRECTION_AliceBob ? "Alice->Bob " : "Bob->Alice ",pkt.seqcount);
+	
+		  if (pkt.tp==PACKETTYPE_Auth) {
+			  packet2mpz(pkt_num, &pkt);
+			  doexp(pkt_num, pkt.direction == DIRECTION_AliceBob ? a : b, pkt_num, p);
+			  SetKey(plt_num, key + pkt.direction);
+			  SetKey(plt_num, key + pkt.direction + 2);
+		//printf("AUTH %s\n",LLong2Hex(&pkt.number,NULL,0,0));
+		  }
+		  else {
+			  EnCryptStr(key + pkt.direction, pkt.data, pkt.len);
+			  printAndChange(&pkt);
+			  DeCryptStr(key + pkt.direction + 2, pkt.data, pkt.len);
+		  }
+    	}
       /* Paket weiterleiten */
       Transmit(con,&pkt,sizeof(pkt));
     }
   }
   while (cnt==sizeof(pkt));
   DisConnect(con);
-  mpz_clears(p, w, wa, wb);
+  mpz_clears(p, w, wa, wb, a, b, pkt_num, NULL);
   return 0;
 }
 
