@@ -28,24 +28,21 @@
 
 void doexp(mpz_t x, mpz_t y, mpz_t z, mpz_t p)
 {
-	if(mpz_cmp_ui(x, 1) || mpz_cmp_ui(y, 0)){
+	if(!mpz_cmp_ui(x, 1) || !mpz_cmp_ui(y, 0)){
 		mpz_set_ui(z, 1);
 		return;
 	}
-	if(mpz_cmp_ui(x, 0)){
+	if(!mpz_cmp_ui(x, 0)){
 		mpz_set_ui(z, 0);
+		return;
+	}
+	if(!mpz_cmp_ui(y, 1)){
+		mpz_set(z, x);
 		return;
 	}
 	
 	mpz_t r;
-	int alloc;
-	alloc = x==z || y==z || p==z;
-	if(alloc){
-		mpz_init_set_ui(r, 1);
-	}else{
-		r = z;
-		mpz_set_ui(r, 1);
-	}
+	mpz_init_set_ui(r, 1);
 	mp_bitcnt_t bit=mpz_sizeinbase(y, 2);
 
 	while(bit--){
@@ -57,8 +54,6 @@ void doexp(mpz_t x, mpz_t y, mpz_t z, mpz_t p)
 			mpz_mod(r, r, p);
 		}
 	}
-	if(alloc){
-		mpz_set(z, r);
-		mpz_clear(r);
-	}
+	mpz_set(z, r);
+	mpz_clear(r);
 }
