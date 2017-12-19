@@ -14,6 +14,7 @@
 #include <stdlib.h>
 
 #include <praktikum.h>
+#include <gmp.h>
 
 #include "versuch.h"
 
@@ -56,39 +57,45 @@ struct {
 
 int main(int argc, char **argv)
 {
-	mpz_t x,y,p,r1,r2;
+  mpz_t x;
+  mpz_t y;
+  mpz_t p;
+  mpz_t r1;
+  mpz_t r2;
   int i;
-
-  mpz_inits(x,y,p,r1,r2,NULL);
+  
+  mpz_init(x);
+  mpz_init(y);
+  mpz_init(p);
+  mpz_init(r1);
+  mpz_init(r2);
 
   for (i=0; i<TABSIZE(TestData); i++) {
 
-	  mpz_set_str(x, TestData[i].x, 16);
-	  mpz_set_str(y, TestData[i].y, 16);
-	  mpz_set_str(p, TestData[i].p, 16);
-	  mpz_set_str(r1, TestData[i].z, 16);
+    mpz_init_set_str(x, TestData[i].x, 16);
+    mpz_init_set_str(y, TestData[i].y, 16);
+    mpz_init_set_str(p, TestData[i].p, 16);
+    mpz_init_set_str(r1, TestData[i].z, 16);
 
-    doexp(x,y,r2,p);
-
-    if (mpz_cmp(r1,r2)) {
+    doexp(x, y, r2, p);
+    
+    if (mpz_cmp(r1, r2)) {
       printf("Ergebnisse differieren bei Test %d:\n",i+1);
-      gmp_printf("  x = %Zd\n",x);
-      gmp_printf("  y = %Zd\n",y);
-      gmp_printf("  p = %Zd\n",p);
-      gmp_printf(" r1 = %Zd\n",r1);
-      gmp_printf(" r2 = %Zd\n",r2);
+      printf("  x = %s\n", mpz_get_str(NULL, 16, x));
+      printf("  y = %s\n", mpz_get_str(NULL, 16, y));
+      printf("  p = %s\n", mpz_get_str(NULL, 16, p));
+      printf(" r1 = %s\n", mpz_get_str(NULL, 16, r1));
+      printf(" r2 = %s\n", mpz_get_str(NULL, 16, r2));
     }else {
       printf("Ergebnisse sind korrekt\n");}
 
   }
-
-  mpz_set_ui(x, 2);
-  mpz_set_ui(y, 3);
-  doexp(x,y,r2,p);
-  ULONG result = mpz_get_ui(r2);
-  printf("doexp(2,3) = %d\n", result);
-
-  mpz_clears(x,y,p,r1,r2,NULL);
+  
+  mpz_clear(x);
+  mpz_clear(y);
+  mpz_clear(p);
+  mpz_clear(r1);
+  mpz_clear(r2);
 
   return 0;
 }

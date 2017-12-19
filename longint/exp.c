@@ -13,23 +13,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <praktikum.h>
+#include <gmp.h>
 
 #include "versuch.h"
-
+                        
 /*
  * doexp(x,y,z,p) : Berechnet z := x^y mod p
- *
- * Hinweise: LModSquare(a,z,p)    z := a^2 mod p
- *           LModMult(a,b,z,p)    z := a*b mod p
- *           LInt2Long(i,z)       z (longnum) := i (integer) (z muß zuvor mit LInitNumber
- *                                initialisiert werden!!)
- *           LGetBit(y,bitpos)    Gibt bit BITPOS der Lanzahl Y zurück.
- *                                Bit 0 ist das niederwertigste Bit.
+ * 
+ * Hinweise: mpz_init(mpz_t a)		Im Speicher wird der Platz für eine Ganzzahl a zur Verfügung gestellt
+ * 					und diese wird mit dem Wert 0 initialisiert.
+ * 
+ * TODO
  */
 
-
-void doexp(const mpz_t x,const mpz_t y,mpz_t z, const mpz_t p)
-  {
+void doexp(mpz_t x, mpz_t y, mpz_t z, mpz_t p)
+{
 	if(mpz_cmp_ui(x, 1) || mpz_cmp_ui(y, 0)){
 		mpz_set_ui(z, 1);
 		return;

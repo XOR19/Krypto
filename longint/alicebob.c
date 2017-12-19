@@ -15,8 +15,14 @@
 #include <stdlib.h>
 #include <praktikum.h>
 #include <network.h>
+#include <gmp.h>
+#include <time.h>
 
 #include "versuch.h"
+
+#ifndef BYTE_LENGTH
+#define BYTE_LENGTH 256
+#endif
 
 /**********************  Globale Konstanten  ********************/
 const char *s_p  = PUBLIC_DATA_p;
@@ -34,9 +40,9 @@ const char *s_wb = PUBLIC_DATA_wb;
 
 static void SetKey(mpz_t num, CipherKey *ck)
   {
-	UBYTE* b = mpz_t2Ubyte(num, MPZLEN);
+    UBYTE * b = mpz_t2Ubyte(num, -1);
     DES_GenKeys(b,0,ck->ikey);
-    memcpy(ck->iv,b+DES_DATA_WIDTH,DES_DATA_WIDTH);
+    memcpy(ck->iv, b+DES_DATA_WIDTH,DES_DATA_WIDTH);
   }
 
 
