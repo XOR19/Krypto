@@ -11,23 +11,29 @@
 **            das Alice/Bob-gespräch
 **/
 
+#include <praktikum.h>
 
-extern void doexp(const mpz_t x,const mpz_t y,mpz_t z, const mpz_t p);
+extern void doexp(mpz_t x, mpz_t y, mpz_t z, mpz_t p);
 
 typedef enum { DIRECTION_AliceBob,DIRECTION_BobAlice } Direction_Typ;
-typedef enum { PACKETTYPE_Auth, PACKETTYPE_Data } Packet_Typ;
+typedef enum { PACKETTYPE_Auth, PACKETTYPE_Data, PACKETTYPE_Error} Packet_Typ;
 typedef char Data_Typ[STRINGLEN];
 
 /*
  * Paket für den Datenaustausch zwischen Alice und Bob
  */
 typedef struct {
-  Direction_Typ direction; /* Richtung: Alice-->Bob,  Bob-->Alice */
-  int seqcount;            /* laufende Paketnummer */
-  Packet_Typ tp;           /* Paket-Typ */
-  UBYTE number[MPZLEN];          /* Bei tp==Auth: Authentifikationsdaten in Form einer Langzahl */
-  Data_Typ data;           /* Bei tp==Data: Nutzdaten in Form eines chiffrierten Strings */
-  int len;                 /*               Anzahl der gültigen Zeichen in DATA */
+  Direction_Typ direction;  /* Richtung: Alice-->Bob,  Bob-->Alice */
+  int seqcount;             /* laufende Paketnummer */
+  Packet_Typ tp;            /* Paket-Typ */
+  UBYTE number[MPZLEN]; /* Bei tp==Auth: Authentifikationsdaten in Form einer Langzahl */
+  Data_Typ data;            /* Bei tp==Data: Nutzdaten in Form eines chiffrierten Strings */
+  int len;                  /*               Anzahl der gültigen Zeichen in DATA */
+  int errorCode;            /* Bei tb==Error: Der Fehlercode
+                                 1: Der Server hat sein Datafile nicht gefunden
+                                 2: Nutzer nicht vorhanden
+                             */
+
 } Packet;
 
 
