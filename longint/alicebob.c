@@ -220,7 +220,7 @@ int main(int argc, char **argv)
 			  // 18171a0225e2aed352413e3ebe172d8f23d234a7edfeca829f0b0b2d9028a22
 			  // aa6aef6638ee9bab065d40960687a60f9cab9c946d7391fa0524cc53dddaad0
 			  // b2eee7553429ea891c2aa4405704fc0ba2c35bd563e8334aea3397b23791a54
-			  // 1
+			  // 1 , has even more problems, so let it be
 			  if(pkt.number[0]=='1' && pkt.number[1]=='8' && pkt.number[2]=='1'){
 				  pkt.number[strlen("18171a0225e2aed352413e3ebe172d8f23d234a7edfeca829f0b0b2d9028a22")] = 0;
 			  }else if(pkt.number[0]=='a' && pkt.number[1]=='a' && pkt.number[2]=='6'){
