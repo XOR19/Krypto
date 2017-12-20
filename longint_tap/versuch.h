@@ -13,8 +13,6 @@
 
 #include <praktikum.h>
 
-extern void doexp(mpz_t x, mpz_t y, mpz_t z, mpz_t p);
-
 typedef enum { DIRECTION_AliceBob,DIRECTION_BobAlice } Direction_Typ;
 typedef enum { PACKETTYPE_Auth, PACKETTYPE_Data, PACKETTYPE_Error} Packet_Typ;
 typedef char Data_Typ[STRINGLEN];

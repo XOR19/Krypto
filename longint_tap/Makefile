@@ -9,22 +9,23 @@
 
 include $(PRAKTROOT)/include/Makefile.Settings
 
-SOURCE	= exp.c tap.c
+SOURCE	= tap.c
 HEADER	= versuch.h
 OBJ	= $(SOURCE:%.c=%.o)
 CFLAGS  += -g
-LFLAGS  += -lgmp
+LFLAGS  += -lgmp -lpthread
 
 BINS	= tap
+
+override CFLAGS += -std=gnu99 
 
 
 all:	$(BINS)
 
-tap:	tap.o 	exp.o
-	$(CC) -o tap tap.o exp.o $(LFLAGS)
+tap:	tap.o
+	$(CC) -o tap tap.o $(LFLAGS)
 
 tap.o:	tap.c	versuch.h
-exp.o:		exp.c		versuch.h
 
 
 #------------------------------------------------------------------------------
