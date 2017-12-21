@@ -214,22 +214,56 @@ static void writeToPkt(Packet* pkt, const char* str){
 	memset(pkt->data+len, 0, sizeof(pkt->data)-len);
 }
 
+static pthread_mutex_t intercept_mutex;
+static pthread_cont_t intercept_cond1;
+static pthread_cont_t intercept_cond2;
+static Connection intercept;
+static Connection intercept_con;
+static Packet* intercept_ret;
+
 static int transmit(Connection c, CipherKey* keys, Packet* pkt, const char* peer){
 	pkt->seqcount++;
 	pkt->tp = PACKETTYPE_Data;
+	pthread_mutex_lock(&intercept_mutex);
+	int cc = intercept && intercept_con==c;
+	if(cc){
+		Transmit(intercept, pkt, sizeof(*pkt));
+		pthread_cond_wait(&intercept_cond1, &intercept_mutex);
+		if(intercept_ret->len==-1){
+			intercept_con = 0;
+			pthread_cond_signal(&intercept_cond2);
+			cc = 0;
+			pthread_mutex_unlock(&intercept_mutex);
+		}else{
+			memcpy(pkt, intercept_ret, sizeof(pkt));
+			pthread_cond_signal(&intercept_cond2);
+		}
+	}else{
+		pthread_mutex_unlock(&intercept_mutex);
+	}
 	int len = pkt->len;
 	int dir = pkt->direction;
 	char send[sizeof(pkt->data)];
 	memcpy(send, pkt->data, len);
 	EnCryptStr(keys+dir, pkt->data, len);
 	Transmit(c, pkt, sizeof(*pkt));
-	if(Receive(c, pkt, sizeof(*pkt))!=sizeof(*pkt))
+	if(Receive(c, pkt, sizeof(*pkt))!=sizeof(*pkt)){
+		if(cc)
+			pthread_mutex_unlock(&intercept_mutex);
 		return 3;
+	}
 	if(pkt->len<0)
 		pkt->len=0;
 	if(pkt->len>sizeof(*pkt))
 		pkt->len=sizeof(*pkt);
 	DeCryptStr(keys+dir+2, pkt->data, pkt->len);
+	if(cc){
+		int l = pkt.len;
+		pkt.len |= 0x10000;
+		Transmit(intercept, pkt, sizeof(*pkt));
+		pkt.len = l;
+		pthread_mutex_unlock(&intercept_mutex);
+	}
 	printf("RECIVED <%s> ", peer);
 	printstring(pkt->data, pkt->len);
 	printf("\n");
@@ -258,6 +292,17 @@ static void * handlePeer(void *arg){
 	Packet pkt;
 	mpz_t tmp;
 	memset(&pkt, 0, sizeof(pkt));
+
+	pthread_mutex_lock(&intercept_mutex);
+	if(intercept && !intercept_con){
+		intercept_con = c;
+		pkt.len = len | 0x20000;
+		memcpy(pkt.data , peer, len);
+		Transmit(intercept, pkt, sizeof(*pkt));
+		memset(&pkt, 0, sizeof(pkt));
+	}
+	pthread_mutex_unlock(&intercept_mutex);
+
 	mpz_init(tmp);
 	int t = rand()&31;
 	mpz_powm_ui(tmp, wb, t, p);
@@ -425,27 +470,40 @@ static void * handlePeer(void *arg){
 	cleanup:
 	printf("DISCONNECT <%s>\n", peer);
 	free(peer);
+	pthread_mutex_lock(&intercept_mutex);
+	if(intercept_con==c)
+		intercept_con = 0;
+	pthread_mutex_unlock(&intercept_mutex);
 	if(c)
 		DisConnect(c);
 	return 0;
 }
 
-static void addPeerName(const char* peer){
+static int doesFileContain(const char* file, const char* str){
 	FILE *fp;
 	char temp[80];
 
-	int pl = strlen(peer);
+	int pl = strlen(str);
 
-	if((fp = fopen("peers.txt", "r"))) {
+	if((fp = fopen(file, "r"))) {
 		while(fgets(temp, 80, fp)) {
 			int len = strlen(temp)-1;
-			if(pl==len && !memcmp(temp, peer, pl)) {
-				return;
+			if(pl==len && !memcmp(temp, str, pl)) {
+				fclose(fp);
+				return 1;
 			}
 		}
 
 		fclose(fp);
 	}
+	return 0;
+}
+
+static void addPeerName(const char* peer){
+	FILE *fp;
+
+	if(doesFileContain("peers.txt", peer))
+		return;
 
 	if(!(fp = fopen("peers.txt", "a"))) {
 		return;
@@ -472,8 +530,107 @@ static void onPeerConnect(const char* peer){
 	pthread_create(&thread, NULL, handlePeer, peername);
 }
 
+static int getPeerCount(){
+	FILE *fp;
+	char ch;
+	int lines = 0;
+
+	if(!(fp = fopen("peers.txt", "r"))) {
+		return 0;
+	}
+
+	while(!feof(fp))
+	{
+	  ch = fgetc(fp);
+	  if(ch == '\n')
+	  {
+	    lines++;
+	  }
+	}
+
+	fclose(fp);
+	return lines;
+}
+
+static void getPeer(Packet* pkt, int peer){
+	FILE *fp;
+
+	if((fp = fopen(file, "r"))) {
+		while(fgets(pkt->data, 80, fp)) {
+			if(peer--==0){
+				fclose(fp);
+				return;
+			}
+		}
+
+		fclose(fp);
+	}
+}
+
+static void onControll(Connection c){
+	Packet pkt;
+	while(Receive(c, &pkt, sizeof(pkt))==sizeof(pkt)){
+		int code = pkt.len >> 16;
+		switch(code){
+		case 0:
+			pthread_mutex_lock(&intercept_mutex);
+			intercept_ret = &pkt;
+			pthread_cond_signal(&intercept_cond1);
+			pthread_cond_wait(&intercept_cond2, &intercept_mutex);
+			pthread_mutex_unlock(&intercept_mutex);
+			break;
+		case 1:
+			pthread_mutex_lock(&intercept_mutex);
+			intercept = c;
+			intercept_con = 0;
+			pthread_mutex_unlock(&intercept_mutex);
+			break;
+		case 2:
+			pthread_mutex_lock(&intercept_mutex);
+			intercept = 0;
+			intercept_con = 0;
+			pthread_mutex_unlock(&intercept_mutex);
+			break;
+		case 3:
+			pkt.seqcount = getPeerCount();
+			pthread_mutex_lock(&intercept_mutex);
+			Transmit(c, &pkt, sizeof(pkt));
+			pthread_mutex_unlock(&intercept_mutex);
+			break;
+		case 4:
+			getPeer(&pkt, pkt.seqcount);
+			pthread_mutex_lock(&intercept_mutex);
+			Transmit(c, &pkt, sizeof(pkt));
+			pthread_mutex_unlock(&intercept_mutex);
+			break;
+		}
+	}
+	pthread_mutex_lock(&intercept_mutex);
+	intercept = 0;
+	intercept_con = 0;
+	pthread_mutex_unlock(&intercept_mutex);
+}
+
+static void* controll(void* arg){
+	PortConnection pc = OpenPort("ABDaemonControll");
+	while(1){
+		Connection c = WaitAtPort(pc);
+		if(!c)
+			break;
+		onControll(c);
+		DisConnect(c);
+	}
+	ClosePort(pc);
+	return 0;
+}
+
 int main(int argc, char **argv){
 	srand(time(NULL));
+	intercept = 0;
+	intercept_con = 0;
+	pthread_mutex_init(&intercept_mutex);
+	pthread_cond_init (&intercept_cond1, 0);
+	pthread_cond_init (&intercept_cond2, 0);
 	mpz_init_set_str(p, s_p, 16);
 	mpz_init_set_str(w, s_w, 16);
 	mpz_init_set_str(wa, s_wa, 16);
@@ -483,6 +640,8 @@ int main(int argc, char **argv){
 	PortConnection pc = forceOpenPort(argc>1?argv[1]:"ABDaemon");
 	if(!pc)
 		exit(1);
+	pthread_t thread;
+	pthread_create(&thread, NULL, controll, NULL);
 	while(1){
 		Connection c = WaitAtPort(pc);
 		if(!c)
