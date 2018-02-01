@@ -173,6 +173,8 @@ RESTART:
 			DisConnect(con);
 			continue;
 		}
+		// Problem: Leak von informationen von voherigen Anfragen
+		memset(&reply, 0, sizeof(reply));
 		// END FIX
 		
 		
