@@ -169,7 +169,7 @@ RESTART:
 		// FIX
 		if(!check_name(other, NETNAME_LEN)){
 			// other hier nicht schreiben, da schlecht
-			printf("%s <!INFO!>: Connect mit schlechtem usernamen\n",now,NET_ErrorText());
+			printf("%s <!INFO!>: Connect mit schlechtem usernamen\n",now);
 			DisConnect(con);
 			continue;
 		}
@@ -193,8 +193,7 @@ RESTART:
 		if(!check_hex(msg.sign_r, sizeof(msg.sign_r)) || !check_hex(msg.sign_s, sizeof(msg.sign_s))){
 				// Zahlen nicht ausgeben, da schlecht
 				printf("%s <%s>: Ungültige signaturnummern\n",now,other);
-				sprintf(reply.body.ReportResponse.Report[0],"Ungültige signaturnummern",
-						msg.body.ReportRequest.Name);
+				strcpy(reply.body.ReportResponse.Report[0],"Ungültige signaturnummern");
 				reply.body.ReportResponse.NumLines = 1;
 		}else
 		// END FIX
@@ -211,8 +210,7 @@ RESTART:
 			if(!check_name(other, NETNAME_LEN)){
 				// Benutzername nicht ausgeben, da schlecht
 				printf("%s <%s>: Schlechter Benutzername\n",now,other);
-				sprintf(reply.body.ReportResponse.Report[0],"Schlechter Benutzername",
-						msg.body.ReportRequest.Name);
+				strcpy(reply.body.ReportResponse.Report[0],"Schlechter Benutzername");
 				reply.body.ReportResponse.NumLines = 1;
 			}else{
 			// END FIX
