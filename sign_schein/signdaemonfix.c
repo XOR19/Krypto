@@ -300,7 +300,16 @@ RESTART:
 					printf("%s <%s>: Verify-Request mit gültiger Dämon-Signatur:\n",now,other);
 					if (msg.body.VerifyRequest.NumLines==0)
 						printf("aber die Nachricht hat die Laenge 0\n");
+				
+				
+					// Fehler: msg.body.VerifyRequest.Report[i] ev. nicht '\0' terminiert
 					// Theoretisch LogInjection möglich, aber aufgabe ist ja schon gelößt
+					// FIX
+					for (i=0; i<msg.body.VerifyRequest.NumLines; i++)
+						msg.body.VerifyRequest.Report[sizeof(msg.body.VerifyRequest.Report[i])-1] = '\0';
+					// END FIX
+				
+				
 					for (i=0; i<msg.body.VerifyRequest.NumLines; i++)
 						printf("\t\"%s\"\n",msg.body.VerifyRequest.Report[i]);
 				}
