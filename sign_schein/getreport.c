@@ -9,7 +9,6 @@
  ** getreport.c: Rahmenprogramm für den Signatur-Versuch
  **/
 
-
 /* 
  * OverrideNetName: Hier den Gruppennamen einsetzen, falls der nicht 
  *                  mit dem Accountnamen uebereinstimmt
@@ -18,8 +17,6 @@
 
 static const char *OverrideNetName = "cr4ck1411";
 
-
-
 #include "sign.h"
 #include <time.h>
 
@@ -27,10 +24,7 @@ static mpz_t p;
 static mpz_t w;
 static gmp_randstate_t state;
 
-const char*const MSG[] = {
-		"Wir haben bestanden :)",
-		NULL
-};
+const char* const MSG[] = { "Wir haben bestanden :)", NULL };
 
 /*
  * Verify_Sign(mdc,r,s,y) :
@@ -40,13 +34,9 @@ const char*const MSG[] = {
  *
  * RETURN-Code: 1, wenn Signatur OK, 0 sonst.
  */
-static int Verify_Sign(mpz_t mdc,  mpz_t r, mpz_t s, mpz_t y)
-{
-	/*>>>>                                               <<<<*
-	 *>>>> AUFGABE: Verifizieren einer El-Gamal-Signatur <<<<*
-	 *>>>>                                               <<<<*/
-	mpz_t tmp1,tmp2;
-	mpz_inits(tmp1,tmp2,NULL);
+static int Verify_Sign(mpz_t mdc, mpz_t r, mpz_t s, mpz_t y) {
+	mpz_t tmp1, tmp2;
+	mpz_inits(tmp1, tmp2, NULL);
 
 	mpz_powm(tmp1, y, r, p);
 	mpz_powm(tmp2, r, s, p);
@@ -57,29 +47,25 @@ static int Verify_Sign(mpz_t mdc,  mpz_t r, mpz_t s, mpz_t y)
 
 	int eq = mpz_cmp(tmp1, tmp2);
 
-	mpz_clears(tmp1,tmp2,NULL);
+	mpz_clears(tmp1, tmp2, NULL);
 
 	return !eq;
 }
-
 
 /*
  * Generate_Sign(mdc,r,s,x) : Erzeugt zu der MDC eine El-Gamal-Signatur 
  *    in R und S. X ist der private Schlüssel
  */
-
-static void Generate_Sign(mpz_t mdc, mpz_t r, mpz_t s, mpz_t x)
-{
-	/*>>>>                                           <<<<*
-	 *>>>> AUFGABE: Erzeugen einer El-Gamal-Signatur <<<<*
-	 *>>>>                                           <<<<*/
-	mpz_t tmp1,tmp2,pm1;
-	mpz_inits(tmp1,tmp2,pm1,NULL);
+static void Generate_Sign(mpz_t mdc, mpz_t r, mpz_t s, mpz_t x) {
+	mpz_t tmp1, tmp2, pm1, upperBound;
+	mpz_inits(tmp1, tmp2, pm1, upperBound, NULL);
 	mpz_sub_ui(pm1, p, 1);
+	mpz_sub_ui(upperBound, p, 3); // later shift {0,...,p-4} to {2,...,p-2}
 
-	do{
-		mpz_urandomm(tmp1, state, pm1);
-	}while(!mpz_invert(tmp2, tmp1, pm1));
+	do {
+		mpz_urandomm(tmp1, state, upperBound);
+		mpz_add_ui(tmp1, tmp1, 2);
+	} while (!mpz_invert(tmp2, tmp1, pm1));
 
 	mpz_powm(r, w, tmp1, p);
 
@@ -89,112 +75,119 @@ static void Generate_Sign(mpz_t mdc, mpz_t r, mpz_t s, mpz_t x)
 	mpz_mul(tmp1, tmp1, tmp2);
 	mpz_mod(s, tmp1, pm1);
 
-	mpz_clears(tmp1,tmp2,NULL);
+	mpz_clears(tmp1, tmp2, pm1, upperBound, NULL);
 }
 
-
-static void Generate_Bad_Sign(Message *msg){
-	static const DES_key key = { 0x7f,0x81,0x5f,0x92,0x1a,0x97,0xaf,0x18 };
-	DES_data reg,desout;
+static void Generate_Bad_Sign(Message *msg) {
+	static const DES_key key = { 0x7f, 0x81, 0x5f, 0x92, 0x1a, 0x97, 0xaf, 0x18 };
+	DES_data reg, desout;
 	DES_ikey ikey;
-	int i,j,len;
+	int i, j, len;
 	UBYTE *ptr;
 
 	switch (msg->typ) {
-		case ReportRequest:
-			ptr = (UBYTE *) &msg->body.ReportRequest;
-			len = sizeof(msg->body.ReportRequest.Name);
-			break;
-		case ReportResponse:
-		case VerifyRequest:
-			ptr = (UBYTE *) &msg->body.ReportResponse.Report;
-			len = sizeof(String)*msg->body.ReportResponse.NumLines;
-			break;
-		case VerifyResponse:
-			ptr = (UBYTE *) &msg->body.VerifyResponse.Res;
-			len = sizeof(msg->body.VerifyResponse.Res);
-			break;
-		default :
-			fprintf(stderr,"GENERATE_MDC: Illegaler Typ von Nachricht!\n");
-			exit(20);
-			break;
+	case ReportRequest:
+		ptr = (UBYTE *) &msg->body.ReportRequest;
+		len = sizeof(msg->body.ReportRequest.Name);
+		break;
+	case ReportResponse:
+	case VerifyRequest:
+		ptr = (UBYTE *) &msg->body.ReportResponse.Report;
+		len = sizeof(String) * msg->body.ReportResponse.NumLines;
+		break;
+	case VerifyResponse:
+		ptr = (UBYTE *) &msg->body.VerifyResponse.Res;
+		len = sizeof(msg->body.VerifyResponse.Res);
+		break;
+	default:
+		fprintf(stderr, "GENERATE_MDC: Illegaler Typ von Nachricht!\n");
+		exit(20);	// why not just return an error code, shutting down seem a bit extreme?
+		break;
 	}
 
-	if(len<=0)
+	if (len <= 0)
 		return;
 
-	DES_GenKeys( key,0,ikey);
-	for (i=0; i<DES_DATA_WIDTH; i++) reg[i]=0;
+	DES_GenKeys(key, 0, ikey);
+	for (i = 0; i < DES_DATA_WIDTH; i++)
+		reg[i] = 0;
 
 	len -= DES_DATA_WIDTH;
 
 	/***************   MDC berechnen   ***************/
-	while (len>=DES_DATA_WIDTH) {
-		DES_Cipher(ikey,reg,desout);
-		for (j=0; j<DES_DATA_WIDTH; j++)
+	while (len >= DES_DATA_WIDTH) {
+		DES_Cipher(ikey, reg, desout);
+		for (j = 0; j < DES_DATA_WIDTH; j++)
 			reg[j] = desout[j] ^ *ptr++;
 		len -= DES_DATA_WIDTH;
 	}
 
-	DES_Cipher(ikey,reg,desout);
-	for (j=0; j<DES_DATA_WIDTH; j++)
+	DES_Cipher(ikey, reg, desout);
+	for (j = 0; j < DES_DATA_WIDTH; j++)
 		*ptr++ = desout[j];
 
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	Connection con;
-	int cnt,ok;
+	int cnt, ok, exitCode = 0;
 	Message msg;
 	mpz_t x, Daemon_y, mdc, sign_r, sign_s;
 	const char *OurName;
 
 	mpz_inits(x, Daemon_y, mdc, sign_r, sign_s, NULL);
+	gmp_randinit_default(state);
+	gmp_randseed_ui(state, time(NULL));
 
 	setenv("PRAKTROOT", ".", 0);
 
 	/**************  Laden der öffentlichen und privaten Daten  ***************/
-	if (!Get_Private_Key("private_key.data", p, w, x) || !Get_Public_Key(DAEMON_NAME, Daemon_y)) exit(0);
+	if (!Get_Private_Key("private_key.data", p, w, x) || !Get_Public_Key(DAEMON_NAME, Daemon_y)) {
+		goto shutdown;
+	}
+
 	/********************  Verbindung zum Dämon aufbauen  *********************/
 	OurName = MakeNetName(NULL); /* gibt in Wirklichkeit Unix-Gruppenname zurück! */
-	if (strlen(OverrideNetName)>0) {
+	if (strlen(OverrideNetName) > 0) {
 		OurName = OverrideNetName;
 	}
-	if (!(con=ConnectTo(OurName,DAEMON_NAME))) {
-		fprintf(stderr,"Kann keine Verbindung zum Daemon aufbauen: %s\n",NET_ErrorText());
-		exit(20);
+	if (!(con = ConnectTo(OurName, DAEMON_NAME))) {
+		fprintf(stderr, "Kann keine Verbindung zum Daemon aufbauen: %s\n", NET_ErrorText());
+		exitCode = 20;
+		goto shutdown;
 	}
 
 	/***********  Message vom Typ ReportRequest initialisieren  ***************/
-	msg.typ  = ReportRequest;                       /* Typ setzten */
-	strcpy(msg.body.ReportRequest.Name,OurName);    /* Gruppennamen eintragen */
+	msg.typ = ReportRequest; /* Typ setzten */
+	strcpy(msg.body.ReportRequest.Name, OurName); /* Gruppennamen eintragen */
 	//Generate_MDC(&msg, p, mdc);                     /* MDC generieren ... */
-	Generate_Bad_Sign(&msg);          /* ... und Nachricht unterschreiben */
+	Generate_Bad_Sign(&msg); /* ... und Nachricht unterschreiben */
 	strcpy(msg.sign_r, "0");
 	strcpy(msg.sign_s, "0");
 
 	/*************  Machricht abschicken, Antwort einlesen  *******************/
 	if (Transmit(con, &msg, sizeof(msg)) != sizeof(msg)) {
-		fprintf(stderr,"Fehler beim Senden des 'ReportRequest': %s\n",NET_ErrorText());
-		exit(20);
+		fprintf(stderr, "Fehler beim Senden des 'ReportRequest': %s\n", NET_ErrorText());
+		exitCode = 20;
+		goto shutdown;
 	}
 
 	if (Receive(con, &msg, sizeof(msg)) != sizeof(msg)) {
-		fprintf(stderr,"Fehler beim Empfang des 'ReportResponse': %s\n",NET_ErrorText());
-		exit(20);
+		fprintf(stderr, "Fehler beim Empfang des 'ReportResponse': %s\n", NET_ErrorText());
+		exitCode = 20;
+		goto shutdown;
 	}
 
 	/******************  Überprüfen der Dämon-Signatur  ***********************/
 	printf("Nachricht vom Dämon:\n");
-	for (cnt=0; cnt<msg.body.ReportResponse.NumLines; cnt++) {
-		printf("\t%s\n",msg.body.ReportResponse.Report[cnt]);
+	for (cnt = 0; cnt < msg.body.ReportResponse.NumLines; cnt++) {
+		printf("\t%s\n", msg.body.ReportResponse.Report[cnt]);
 	}
 
 	Generate_MDC(&msg, p, mdc);
 	mpz_set_str(sign_r, msg.sign_r, 16);
 	mpz_set_str(sign_s, msg.sign_s, 16);
-	ok=Verify_Sign(mdc, sign_r, sign_s, Daemon_y);
+	ok = Verify_Sign(mdc, sign_r, sign_s, Daemon_y);
 	if (ok) {
 		printf("Dämon-Signatur ist ok!\n");
 	} else {
@@ -205,28 +198,31 @@ int main(int argc, char **argv)
 	 *>>>> AUFGABE: Fälschen der Dämon-Signatur <<<<*
 	 *>>>>                                      <<<<*/
 
-	if (!(con=ConnectTo(OurName,DAEMON_NAME))) {
-		fprintf(stderr,"Kann keine Verbindung zum Daemon aufbauen: %s\n",NET_ErrorText());
-		exit(20);
+	if (!(con = ConnectTo(OurName, DAEMON_NAME))) {
+		fprintf(stderr, "Kann keine Verbindung zum Daemon aufbauen: %s\n", NET_ErrorText());
+		exitCode = 20;
+		goto shutdown;
 	}
 
 	msg.typ = VerifyRequest;
-	for(cnt=0; cnt<MaxLines && MSG[cnt]; cnt++){
+	for (cnt = 0; cnt < MaxLines && MSG[cnt]; cnt++) {
 		strcpy(msg.body.VerifyRequest.Report[cnt], MSG[cnt]);
 	}
 	msg.body.VerifyRequest.NumLines = cnt;
-	Generate_Bad_Sign(&msg);          /* ... und Nachricht unterschreiben */
+	Generate_Bad_Sign(&msg); /* ... und Nachricht unterschreiben */
 	strcpy(msg.sign_r, "0");
 	strcpy(msg.sign_s, "0");
 
 	if (Transmit(con, &msg, sizeof(msg)) != sizeof(msg)) {
-		fprintf(stderr,"Fehler beim Senden des 'VerifyRequest': %s\n",NET_ErrorText());
-		exit(20);
+		fprintf(stderr, "Fehler beim Senden des 'VerifyRequest': %s\n", NET_ErrorText());
+		exitCode = 20;
+		goto shutdown;
 	}
 
 	if (Receive(con, &msg, sizeof(msg)) != sizeof(msg)) {
-		fprintf(stderr,"Fehler beim Empfang des 'VerifyResponse': %s\n",NET_ErrorText());
-		exit(20);
+		fprintf(stderr, "Fehler beim Empfang des 'VerifyResponse': %s\n", NET_ErrorText());
+		exitCode = 20;
+		goto shutdown;
 	}
 
 	printf("Nachricht vom Dämon:\n");
@@ -235,16 +231,16 @@ int main(int argc, char **argv)
 	Generate_MDC(&msg, p, mdc);
 	mpz_set_str(sign_r, msg.sign_r, 16);
 	mpz_set_str(sign_s, msg.sign_s, 16);
-	ok=Verify_Sign(mdc, sign_r, sign_s, Daemon_y);
+	ok = Verify_Sign(mdc, sign_r, sign_s, Daemon_y);
 	if (ok) {
 		printf("Dämon-Signatur ist ok!\n");
 	} else {
 		printf("Dämon-Signatur ist FEHLERHAFT!\n");
 	}
 
-
+	shutdown:
 	mpz_clears(x, Daemon_y, mdc, sign_r, sign_s, NULL);
-	return 0;
+	gmp_randclear(state);
+	return exitCode;
 }
-
 
